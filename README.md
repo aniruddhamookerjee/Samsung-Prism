@@ -33,20 +33,37 @@ writes a few MB. Other names: `python tools/fetch_euroc.py --list V1` (also
 swap, in case the evaluation files were made that way. `--burst-len 5 400`
 gives gaps up to 2 s.
 
-## Scoring with evo
+## Scoring
 
 ```
-python tools/stay_still.py data/degraded/V1_02_medium/imu0/data.csv results/still.txt
-evo_ape tum data/euroc/V1_02_medium/gt.tum results/still.txt -a
+python tools/score.py <estimator.py> --label <name>
 ```
 
-Notes from the first runs:
+The estimator is run as `python estimator.py <imu csv> <output txt>` on every
+recording under `data/degraded`. One row per recording is printed and appended
+to `results/results.csv`. Add `--data data/degraded data/degraded_raw` to score
+more sets, `--no-save` to leave the table alone.
 
+| column | meaning |
+| --- | --- |
+| format | `ok`, or what is wrong with the output file (row count, columns, nan, timestamps, quaternion norm) |
+| ate_m | position RMSE after rigid alignment, same as `evo_ape tum gt est -a` |
+| blind_m | same error, only over the all-zero rows at the end |
+| gap_m | same error, from each dropout to 1 s after it |
+| rpe_1s_m | drift over 1 s steps |
+| rot_deg | orientation RMSE after alignment, same as `evo_ape -a -r angle_deg` |
+| ms_per_s | runtime per second of data, imports included, best of 3. Limit 20 |
+| mem_mb | tracemalloc peak on top of what `import numpy` already holds. Limit 8 |
+| mem_with_imports_mb | tracemalloc peak counting everything |
+
+Notes:
+
+- ate_m and rot_deg agree with evo to 3 decimals on a test path.
 - evo accepts files with repeated timestamps, so we keep one pose per input row.
 - `evo_ape -a` refuses a path that never moves ("Degenerate covariance rank").
-  The stay-still baseline has to be scored without evo's alignment.
-- Stay-still error (RMS distance of the true path from its mean):
-  V1_02_medium 1.78 m, V1_03_difficult 1.58 m. This is the number to beat.
+  `score.py` falls back to a shift only, so the stay-still baseline still gets a number.
+- `import numpy` alone shows up as about 6.7 MB in tracemalloc. If the organisers
+  count imports, 8 MB is not reachable with NumPy, so this is worth asking them.
 - EuRoC ground truth starts about 1 s after the IMU file and stops about 1 s
   before it ends, so only 4 of the last 5 blind seconds can be scored.
 - With `--raw-order` the script reads the gyro columns as accel in g, so the
@@ -57,5 +74,5 @@ Notes from the first runs:
 ```
 tools/   data download, degradation, format helpers
 data/    local only
-results/ local only
+results/ results.csv is tracked, the rest is local
 ```

@@ -13,22 +13,31 @@ FIELDS = ["date", "label", "set", "seq", "format", "ate_m", "blind_m", "gap_m",
           "rpe_1s_m", "rot_deg", "ms_per_s", "mem_mb", "mem_with_imports_mb"]
 
 
-def run(script, src, dst, mode):
-    p = subprocess.run([sys.executable, str(RUNNER), mode, str(script), str(src), str(dst)],
-                       capture_output=True, text=True)
+def run(script, src, dst, mode, timeout):
+    try:
+        p = subprocess.run([sys.executable, str(RUNNER), mode, str(script), str(src), str(dst)],
+                           capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return {"error": f"timeout after {timeout} s"}
     for line in p.stderr.splitlines():
         if line.startswith("@@"):
             return json.loads(line[2:])
-    sys.exit(f"{script} failed on {src}:\n{p.stderr[-2000:]}")
+    last = [l for l in p.stderr.splitlines() if l.strip()]
+    return {"error": "crashed: " + (last[-1].strip() if last else f"exit code {p.returncode}")}
 
 
 def read_est(path, ts_ns):
+    if not Path(path).exists():
+        return None, "no output file"
     rows = [l.split() for l in open(path) if l.strip() and not l.startswith("#")]
     if len(rows) != len(ts_ns):
         return None, f"{len(rows)} rows, input has {len(ts_ns)}"
     if any(len(r) != 8 for r in rows):
         return None, "not 8 columns"
-    est = np.array(rows, dtype=float)
+    try:
+        est = np.array(rows, dtype=float)
+    except ValueError:
+        return None, "not numbers"
     if not np.isfinite(est).all():
         return None, "nan or inf"
     if np.abs(est[:, 0] - ts_ns * 1e-9).max() > 1e-6:
@@ -71,6 +80,8 @@ def metrics(est, gt, ts_ns, imu, gap_tail):
     i -= (t - gt[i - 1, 0]) < (gt[i, 0] - t)
     ok = np.abs(gt[i, 0] - t) < 0.01
     t, est, g = t[ok], est[ok], gt[i[ok]]
+    if len(t) < 3:
+        return {}
 
     r, tr = align(est[:, 1:4], g[:, 1:4])
     pe = est[:, 1:4] @ r.T + tr
@@ -82,7 +93,8 @@ def metrics(est, gt, ts_ns, imu, gap_tail):
 
     tin = ts_ns * 1e-9
     dead = np.flatnonzero((imu != 0).any(axis=1))
-    blind_from = tin[dead[-1] + 1] if dead[-1] + 1 < len(tin) else np.inf
+    last = dead[-1] if len(dead) else -1
+    blind_from = tin[last + 1] if last + 1 < len(tin) else np.inf
     blind = t >= blind_from
 
     dt = np.diff(tin)
@@ -108,17 +120,23 @@ def metrics(est, gt, ts_ns, imu, gap_tail):
     }
 
 
-def score(script, seq_dir, gt_path, out_dir, repeats, gap_tail):
+def score(script, seq_dir, gt_path, out_dir, repeats, gap_tail, timeout):
     src = seq_dir / "imu0" / "data.csv"
     dst = out_dir / f"{seq_dir.parent.name}_{seq_dir.name}.txt"
-    ts_ns = np.loadtxt(src, delimiter=",", comments="#", usecols=0, dtype=np.int64)
-    imu = np.loadtxt(src, delimiter=",", comments="#", usecols=range(1, 7))
+    dst.unlink(missing_ok=True)
+    ts_ns = np.loadtxt(src, delimiter=",", comments="#", usecols=0, dtype=np.int64, ndmin=1)
+    imu = np.loadtxt(src, delimiter=",", comments="#", usecols=range(1, 7), ndmin=2)
 
-    seconds = min(run(script, src, dst, "time")["seconds"] for _ in range(repeats))
-    mem = run(script, src, dst, "mem")
+    runs = [run(script, src, dst, "time", timeout) for _ in range(repeats)]
+    bad = [r["error"] for r in runs if "error" in r]
+    if bad:
+        return {"format": bad[0]}
+    mem = run(script, src, dst, "mem", timeout * 5)
+    if "error" in mem:
+        return {"format": mem["error"]}
 
     row = {
-        "ms_per_s": 1000 * seconds / ((ts_ns[-1] - ts_ns[0]) * 1e-9),
+        "ms_per_s": 1000 * min(r["seconds"] for r in runs) / max((ts_ns[-1] - ts_ns[0]) * 1e-9, 1e-9),
         "mem_mb": (mem["peak"] - mem["base"]) / 2**20,
         "mem_with_imports_mb": mem["peak"] / 2**20,
     }
@@ -138,16 +156,21 @@ def main():
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--gap-tail", type=float, default=1.0,
                     help="seconds after each gap that count towards gap_m")
+    ap.add_argument("--stress", action="store_true", help="score every set under data/stress instead")
+    ap.add_argument("--timeout", type=float, default=120, help="seconds allowed per run")
     ap.add_argument("--no-save", action="store_true")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
     (out_dir / "runs").mkdir(parents=True, exist_ok=True)
+    sets = [Path(d) for d in args.data]
+    if args.stress:
+        sets = sorted(p for p in Path("data/stress").iterdir() if p.is_dir())
     rows = []
-    for data in map(Path, args.data):
+    for data in sets:
         for seq_dir in sorted(p for p in data.iterdir() if (p / "imu0" / "data.csv").exists()):
             row = score(args.script, seq_dir, Path(args.gt) / seq_dir.name / "gt.tum",
-                        out_dir / "runs", args.repeats, args.gap_tail)
+                        out_dir / "runs", args.repeats, args.gap_tail, args.timeout)
             rows.append({"date": date.today().isoformat(), "label": args.label,
                          "set": data.name, "seq": seq_dir.name, **row})
 

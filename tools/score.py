@@ -133,7 +133,7 @@ def main():
     ap.add_argument("script", help="estimator, run as: script <imu csv> <output txt>")
     ap.add_argument("--label", required=True, help="name for this version in the results table")
     ap.add_argument("--data", nargs="+", default=["data/degraded"])
-    ap.add_argument("--gt", default="data/euroc")
+    ap.add_argument("--gt", default="data/clean")
     ap.add_argument("--out", default="results")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--gap-tail", type=float, default=1.0,

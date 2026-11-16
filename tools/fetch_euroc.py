@@ -174,7 +174,7 @@ def fetch(seq, out_dir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("seq", nargs="*", help="e.g. V1_02_medium V1_03_difficult")
-    ap.add_argument("--out", default="data/euroc")
+    ap.add_argument("--out", default="data/clean")
     ap.add_argument("--list", choices=sorted(BUNDLES), help="print the bundle's file names and exit")
     args = ap.parse_args()
 

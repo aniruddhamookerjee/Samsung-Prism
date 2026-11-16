@@ -14,6 +14,28 @@ GYRO = ["gx", "gy", "gz"]
 ACC = ["ax", "ay", "az"]
 
 
+def degrade_file(imu_csv, out_dir, raw_order=False, cfg=None):
+    cfg = cfg or dict(CONFIG)
+    df = pd.read_csv(imu_csv, comment="#", header=None,
+                     names=["timestamp"] + GYRO + ACC)
+    if raw_order:
+        out, stats = degrade(df, cfg, SEED)
+    else:
+        out, stats = degrade(df[["timestamp"] + ACC + GYRO], cfg, SEED,
+                             ts_unit="ns", accel_unit="ms2")
+        out = out[["timestamp"] + GYRO + ACC]
+    stats["raw_order"] = raw_order
+
+    dst = Path(out_dir) / "imu0"
+    dst.mkdir(parents=True, exist_ok=True)
+    with open(dst / "data.csv", "w", newline="\n") as f:
+        f.write(EUROC_HEADER + "\n")
+        out.to_csv(f, index=False, header=False, lineterminator="\n")
+    with open(Path(out_dir) / "meta.json", "w") as f:
+        json.dump(stats, f, indent=2)
+    return stats
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("imu_csv", help="clean EuRoC imu0/data.csv")
@@ -33,25 +55,7 @@ def main():
     if args.burst_len is not None:
         cfg["burst_len"] = tuple(args.burst_len)
 
-    df = pd.read_csv(args.imu_csv, comment="#", header=None,
-                     names=["timestamp"] + GYRO + ACC)
-
-    if args.raw_order:
-        out, stats = degrade(df, cfg, SEED)
-    else:
-        out, stats = degrade(df[["timestamp"] + ACC + GYRO], cfg, SEED,
-                             ts_unit="ns", accel_unit="ms2")
-        out = out[["timestamp"] + GYRO + ACC]
-    stats["raw_order"] = args.raw_order
-
-    dst = Path(args.out_dir) / "imu0"
-    dst.mkdir(parents=True, exist_ok=True)
-    with open(dst / "data.csv", "w", newline="\n") as f:
-        f.write(EUROC_HEADER + "\n")
-        out.to_csv(f, index=False, header=False, lineterminator="\n")
-    with open(Path(args.out_dir) / "meta.json", "w") as f:
-        json.dump(stats, f, indent=2)
-
+    stats = degrade_file(args.imu_csv, args.out_dir, args.raw_order, cfg)
     print(f"{stats['rows_in']} -> {stats['rows_out']} rows, "
           f"{stats['dropped_total']} dropped, {stats['duplicated_rows']} duplicated, "
           f"{stats['failure_frames']} zeroed at the end")

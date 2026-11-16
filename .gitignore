@@ -1,5 +1,6 @@
 data/
-results/
+results/*
+!results/results.csv
 __pycache__/
 *.pyc
 .venv/

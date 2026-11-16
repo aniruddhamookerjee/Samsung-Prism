@@ -1,0 +1,5 @@
+date,label,set,seq,format,ate_m,blind_m,gap_m,rpe_1s_m,rot_deg,ms_per_s,mem_mb,mem_with_imports_mb
+2026-11-16,stay-still,degraded,V1_02_medium,ok,1.7775,1.0421,1.6087,0.9568,145.7397,0.2755,0.7311,0.7313
+2026-11-16,stay-still,degraded,V1_03_difficult,ok,1.5820,1.2737,1.0910,0.7273,148.2145,0.2673,0.7311,0.7314
+2026-11-16,stay-still,degraded_raw,V1_02_medium,ok,1.7775,1.0421,1.6087,0.9568,145.7397,0.2727,0.7312,0.7315
+2026-11-16,stay-still,degraded_raw,V1_03_difficult,ok,1.5820,1.2737,1.0910,0.7273,148.2145,0.2559,0.7312,0.7315

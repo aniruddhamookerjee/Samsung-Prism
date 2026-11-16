@@ -14,10 +14,12 @@ GYRO = ["gx", "gy", "gz"]
 ACC = ["ax", "ay", "az"]
 
 
-def degrade_file(imu_csv, out_dir, raw_order=False, cfg=None):
-    cfg = cfg or dict(CONFIG)
+def degrade_file(imu_csv, out_dir, raw_order=False, cfg=None, seconds=None):
+    cfg = {**CONFIG, **(cfg or {})}
     df = pd.read_csv(imu_csv, comment="#", header=None,
                      names=["timestamp"] + GYRO + ACC)
+    if seconds is not None:
+        df = df[df["timestamp"] - df["timestamp"].iloc[0] <= seconds * 1e9].reset_index(drop=True)
     if raw_order:
         out, stats = degrade(df, cfg, SEED)
     else:

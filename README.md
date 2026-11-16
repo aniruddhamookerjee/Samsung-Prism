@@ -45,6 +45,12 @@ Notes from the first runs:
 - evo accepts files with repeated timestamps, so we keep one pose per input row.
 - `evo_ape -a` refuses a path that never moves ("Degenerate covariance rank").
   The stay-still baseline has to be scored without evo's alignment.
+- Stay-still error (RMS distance of the true path from its mean):
+  V1_02_medium 1.78 m, V1_03_difficult 1.58 m. This is the number to beat.
+- EuRoC ground truth starts about 1 s after the IMU file and stops about 1 s
+  before it ends, so only 4 of the last 5 blind seconds can be scored.
+- With `--raw-order` the script reads the gyro columns as accel in g, so the
+  gyro gets about 0.02 rad/s of noise at the end and the accel almost none.
 
 ## Layout
 

@@ -67,6 +67,39 @@ Stay-still baseline, the numbers to beat (metres):
 
 Every scored version is in `results/results.csv`.
 
+## Stress sets
+
+```
+python tools/prepare_data.py --stress
+python tools/score.py <estimator.py> --label <name> --stress
+```
+
+| set | what changes |
+| --- | --- |
+| gaps2s | bursts up to 400 rows and twice as often, longest gap 2.0 to 3.5 s |
+| harsh | damage level 2.0, twice the organisers' maximum |
+| early | gamma 0.7, so the damage arrives early instead of at the end |
+| harsh_raw | harsh, with the script fed EuRoC column order |
+| short10 | first 10 s only, half of it is the all-zero ending |
+| short3 | first 3 s only, too short for the script to add a zero ending |
+| tiny | 4 or 5 rows |
+
+An estimator that crashes, hangs (`--timeout`, 120 s by default) or writes a bad
+file gets a row saying so in the `format` column and the run carries on.
+
+What the two reference estimators showed:
+
+- Neither crashes or writes a bad file on any set.
+- Stay-still error barely moves with the damage (it ignores the data), so these
+  sets only tell us something once a real estimator is scored on them.
+- Fixed start-up cost matters on short files. Stay-still spends 0.6 ms/s on a
+  full recording but 8 ms/s on a 3 s file, with no NumPy import at all. If the
+  evaluation file is short, a 100 to 150 ms NumPy import alone could use most
+  of the 20 ms/s.
+- Plain integration is 18 m off after 10 s and 0.5 to 0.9 m off after 3 s.
+- Both Vicon Room recordings start with the drone still for the first few
+  seconds, which is what the 2 s calibration window needs.
+
 Notes:
 
 - ate_m and rot_deg agree with evo to 3 decimals on a test path.

@@ -23,9 +23,11 @@ class Tar:
 
     @staticmethod
     def _get(url, lo, hi):
+        import ssl
+        ctx = ssl._create_unverified_context()
         req = urllib.request.Request(url, headers={
             "Range": f"bytes={lo}-{hi}", "User-Agent": "Mozilla/5.0"})
-        return urllib.request.urlopen(req, timeout=300)
+        return urllib.request.urlopen(req, timeout=300, context=ctx)
 
     def read(self, lo, n):
         return self._get(self.url, lo, lo + n - 1).read()

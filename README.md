@@ -32,19 +32,21 @@ acceleration, metres of error within half a minute). Fast motion and height are
 much better. So the estimate keeps fast motion at almost full size and slow
 horizontal motion at a quarter, and never lets drift accumulate.
 
-### Results (sarthak-v2, metres)
+### Results (sarthak-v3, metres)
 
 | recording | stay-still ate | ours ate | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.24 | 1.04 | 1.06 |
-| V1_03_difficult | 1.58 | 1.36 | 1.27 | 1.38 |
-| MH_04_difficult | 6.81 | 6.50 | 3.85 | 3.83 |
-| tumvi_room1 | 1.00 | 0.36 | 0.63 | 0.62 |
+| V1_02_medium | 1.78 | 1.23 | 1.04 | 1.06 |
+| V1_03_difficult | 1.58 | 1.34 | 1.27 | 1.25 |
+| MH_04_difficult | 6.81 | 6.50 | 3.85 | 3.65 |
+| tumvi_room1 | 1.00 | 0.35 | 0.63 | 0.65 |
 
-Across the default, raw-order and four harsher stress sets (20 runs), the path
-error is 22% below stay-still on average and below it in every run. Peak memory
-is 2.7 to 3.5 MB (tracemalloc, after `import numpy`), runtime 1.4 to 2 ms per
-second of data. Full rows are in `results/results.csv`.
+Across the default, raw-order and four harsher stress sets (24 runs), the path
+error is 0.77 of stay-still on average and below it in every run; the blind
+error is 0.98 of stay-still on average. Peak memory is 2.1 to 2.6 MB
+(tracemalloc, after `import numpy`), runtime 1.4 to 2.3 ms per second of data.
+Full rows are in `results/results.csv`. `python tools/plot_path.py
+data/degraded/tumvi_room1` draws the estimate against the ground truth.
 
 Known limits:
 
@@ -53,7 +55,7 @@ Known limits:
   better, but an IMU alone cannot place the end of the path that well, and
   plain integration from the still start is already 0.5 to 3 m off after 10 s.
 - A 3 s file takes about 30 ms per second, nearly all of it the NumPy import.
-- About 2 MB of tracemalloc peak is Python compiling the script itself, on any input.
+- About 2.1 MB of tracemalloc peak is Python compiling the script itself, on any input.
 - Tuning: `python tools/tune.py key=value ...` scores settings in-process.
 
 ## Practice data

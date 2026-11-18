@@ -2,6 +2,57 @@
 
 Estimate a 6-DoF trajectory from a degraded IMU recording only.
 
+## Running the estimator
+
+```
+python src/main.py <imu0/data.csv | folder | zip> [estimated_trajectory.txt]
+```
+
+Python 3 and NumPy only, single thread. The input can be the csv, a folder that
+holds `imu0/data.csv`, or a zip of that folder. The output is TUM format with
+exactly one pose per input row and the input timestamps copied digit for digit
+(nanoseconds written as seconds). Duplicated input rows get duplicated poses.
+
+### How it works
+
+| step | what it does | why |
+| --- | --- | --- |
+| read | streams the csv into float32 arrays | memory |
+| clean | drops duplicate rows, stuck repeats and spikes (a sample far from the median of its neighbours, scaled by local noise), finds the all-zero ending | the script's damage types |
+| resample | valid rows onto a uniform grid, gaps bridged by interpolation, gaps over 0.3 s flagged | dropouts |
+| attitude | gyro integrated at full rate with the bias from the first 1.5 s, then the tilt pulled back to gravity using a 30 s average of world acceleration, separately between long gaps | stops tilt drift without erasing real motion |
+| position | world acceleration averaged to 20 Hz, gravity removed, double-integrated in the frequency domain inside a band-pass | slow drift from bias and tilt error never builds up |
+| shrink | horizontal gain 0.25 below 0.08 Hz and 0.9 above, height gain 0.3; position faded towards zero where the gyro is mostly noise | a path that is too big costs more than one that is too small |
+| blind 5 s | coast for a moment on the last velocity, then return to the path centre | the sensor gives nothing there |
+| write | poses interpolated onto every input timestamp, 1024 rows at a time | memory |
+
+The idea behind the shrink: with an IMU alone, slow horizontal motion cannot be
+told apart from a small tilt error (1 degree of tilt is 0.17 m/s^2 of false
+acceleration, metres of error within half a minute). Fast motion and height are
+much better. So the estimate keeps fast motion at almost full size and slow
+horizontal motion at a quarter, and never lets drift accumulate.
+
+### Results (sarthak-v2, metres)
+
+| recording | stay-still ate | ours ate | stay-still blind | ours blind |
+| --- | --- | --- | --- | --- |
+| V1_02_medium | 1.78 | 1.24 | 1.04 | 1.06 |
+| V1_03_difficult | 1.58 | 1.36 | 1.27 | 1.38 |
+| MH_04_difficult | 6.81 | 6.50 | 3.85 | 3.83 |
+| tumvi_room1 | 1.00 | 0.36 | 0.63 | 0.62 |
+
+Across the default, raw-order and four harsher stress sets (20 runs), the path
+error is 22% below stay-still on average and below it in every run. Peak memory
+is 2.7 to 3.5 MB (tracemalloc, after `import numpy`), runtime 1.4 to 2 ms per
+second of data. Full rows are in `results/results.csv`.
+
+Known limits:
+
+- The blind 5 s is about as good as stay-still, not better.
+- A 3 s file takes about 30 ms per second, nearly all of it the NumPy import.
+- About 2 MB of tracemalloc peak is Python compiling the script itself, on any input.
+- Tuning: `python tools/tune.py key=value ...` scores settings in-process.
+
 ## Practice data
 
 Everything under `data/` is generated locally and not committed.

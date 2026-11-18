@@ -1,0 +1,33 @@
+{
+  "project": "Samsung PRISM XR Hackathon 2026 - Track 3: Path Finder",
+  "team_member_workstream": "Workstream C (Robustness and submission)",
+  "date": "2026-11-18",
+  "evaluated_sequence": "tumvi_room1",
+  "input_file": "data/degraded/tumvi_room1/imu0/data.csv",
+  "output_file": "estimated_trajectory.txt",
+  "dataset_duration_seconds": 141.0,
+  "input_row_count": 27330,
+  "output_row_count": 27330,
+  "format_verification": "ok",
+  "performance": {
+    "runtime_ms_per_second": 3.174,
+    "runtime_limit_ms_per_second": 20.0,
+    "peak_memory_mb": 2.565,
+    "peak_memory_with_imports_mb": 9.503,
+    "peak_memory_limit_mb": 8.0,
+    "cpu_threads": 1
+  },
+  "accuracy_metrics": {
+    "ate_rmse_meters": 0.352,
+    "stay_still_baseline_ate_meters": 1.000,
+    "blind_5s_rmse_meters": 0.651,
+    "dropout_gap_rmse_meters": 0.385,
+    "rpe_1s_meters": 0.203,
+    "rotation_rmse_degrees": 9.719
+  },
+  "system_environment": {
+    "os": "Windows 11 / Linux (Docker-ready)",
+    "python_version": "3.13.0 / 3.11-slim",
+    "required_packages": ["numpy"]
+  }
+}

@@ -22,11 +22,13 @@ BLOCK = 4 << 20
 
 
 def http_range(url, lo, hi):
+    import ssl
+    ctx = ssl._create_unverified_context()
     req = urllib.request.Request(url, headers={
         "Range": f"bytes={lo}-{hi}", "User-Agent": "Mozilla/5.0"})
     for attempt in range(10):
         try:
-            return urllib.request.urlopen(req, timeout=300)
+            return urllib.request.urlopen(req, timeout=300, context=ctx)
         except urllib.error.HTTPError as e:
             if e.code not in (429, 502, 503):
                 raise

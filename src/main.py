@@ -35,7 +35,8 @@ OUT_CHUNK = 1024
 
 # tuned on the practice recordings, see README
 CFG = {
-    "calib_s": 1.5,        # start window for gyro bias and initial tilt
+    "calib_s": 2.0,        # longest start window used for gyro bias and initial tilt,
+                           # cut short as soon as the device moves
     "tilt_window_s": 30.0, # averaging window for the gravity direction
     "band_lo_hz": 0.02,    # position keeps motion above this frequency ...
     "band_hi_hz": 0.04,    # ... fully above this one, with a smooth ramp between
@@ -345,11 +346,28 @@ def apply_correction(q, corr, d):
         q[s:e] = r / np.linalg.norm(r, axis=1, keepdims=True)
 
 
+def still_prefix(g, fs):
+    """Samples at the start before the device first moves, up to calib_s.
+
+    Checked in quarter-second windows: the gyro and the accelerometer must
+    both be quiet. Returns 0 when it is moving from the first sample.
+    """
+    w = max(int(0.25 * fs), 2)
+    limit = min(int(CFG["calib_s"] * fs), len(g))
+    n = 0
+    while n + w <= limit:
+        x = g[n:n + w].astype(np.float64)
+        sd = x.std(axis=0)
+        if math.sqrt(float((sd[0:3] ** 2).sum())) > 0.05 or math.sqrt(float((sd[3:6] ** 2).sum())) > 0.3:
+            break
+        n += w
+    return n
+
+
 def attitude(g, fs, d, calib_n, bgap, seg):
-    head_g = g[:calib_n, 0:3].astype(np.float64)
-    still = len(head_g) > 10 and np.linalg.norm(head_g.std(axis=0)) < 0.05
-    bias = head_g.mean(axis=0) if still else np.zeros(3)
-    q0 = arc_to_z(g[:max(calib_n, 1), 3:6].astype(np.float64).mean(axis=0, keepdims=True))[0]
+    bias = g[:calib_n, 0:3].astype(np.float64).mean(axis=0) if calib_n > 0 else np.zeros(3)
+    head = max(calib_n, min(int(0.25 * fs), len(g)), 1)
+    q0 = arc_to_z(g[:head, 3:6].astype(np.float64).mean(axis=0, keepdims=True))[0]
     q = integrate_gyro(g[:, 0:3], q0, fs, bias)
 
     # offline tilt correction: averaged over tens of seconds, world acceleration
@@ -493,14 +511,14 @@ def estimate(ts, imu):
     grid0, g, gap = resample(t, imu, valid, fs)
     del valid, imu, t
     d = max(int(round(fs / CFG["pos_hz"])), 1)
-    calib_n = max(int(CFG["calib_s"] * fs), 1)
+    calib_n = still_prefix(g, fs)
     bgap, seg = block_flags(gap, d)
     del gap
     q = attitude(g, fs, d, calib_n, bgap, seg)
 
     if len(q) >= 2 * d:
         acc_w = block_world_acc(q, g[:, 3:6], d)
-        cb = max(calib_n // d, 1)
+        cb = max(max(calib_n, int(0.25 * fs)) // d, 1)
         g_mag = float(np.linalg.norm(acc_w[:cb].mean(axis=0)))
         acc_w[:, 2] -= g_mag
         acc_w[bgap] = 0.0          # nothing was measured there

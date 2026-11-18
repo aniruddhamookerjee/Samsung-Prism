@@ -76,6 +76,21 @@ def open_input(path):
     return open(path, "r", encoding="utf-8-sig")
 
 
+def seconds_to_ns(text):
+    """'1403636579.758555392' -> 1403636579758555392 exactly, no float rounding."""
+    text = text.strip()
+    if "e" in text.lower():
+        return int(round(float(text) * 1e9))
+    whole, _, frac = text.partition(".")
+    if not whole.lstrip("+-").isdigit() and whole not in ("", "-", "+"):
+        raise ValueError(text)
+    sign = -1 if whole.startswith("-") else 1
+    frac = (frac + "000000000")[:9]
+    if not frac.isdigit():
+        raise ValueError(text)
+    return sign * (abs(int(whole or "0")) * 1000000000 + int(frac))
+
+
 def read_imu(path):
     ts = array("q")
     vals = array("f")
@@ -91,8 +106,8 @@ def read_imu(path):
                 row = (float(c[1]), float(c[2]), float(c[3]),
                        float(c[4]), float(c[5]), float(c[6]))
             except ValueError:
-                try:  # a header without '#', or a float timestamp
-                    t = int(float(c[0]))
+                try:  # a timestamp in seconds, or a header without '#'
+                    t = seconds_to_ns(c[0])
                     row = tuple(float(v) for v in c[1:7])
                 except ValueError:
                     continue

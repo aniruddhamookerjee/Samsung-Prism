@@ -43,7 +43,8 @@ CFG = {
     "gain": 0.25,          # horizontal shrink below split_hz: a too-large path costs more than a small one
     "gain_hi": 0.9,        # horizontal shrink above split_hz
     "split_hz": 0.08,
-    "z_gain": 0.3,         # vertical shrink
+    "z_gain": 0.3,         # vertical shrink below split_hz
+    "z_gain_hi": 0.9,      # vertical shrink above split_hz
     "z_band_lo_hz": 0.02,  # vertical pass band starts here
     "coast_tau_s": 0.6,    # blind segment: velocity decays with this time constant
     "return_tau_s": 1.0,   # blind segment: move to the target with this time constant
@@ -393,7 +394,8 @@ def band_integrate(a, fs):
     h_gain = base * ramp(CFG["band_lo_hz"], CFG["band_hi_hz"]) * (
         CFG["gain"] + (CFG["gain_hi"] - CFG["gain"]) * ramp(split / 1.5, split * 1.5))
     # vertical: tilt error only leaks g*(1-cos(tilt)), so a wider band holds up
-    z_gain = base * ramp(CFG["z_band_lo_hz"], 2 * CFG["z_band_lo_hz"]) * CFG["z_gain"]
+    z_gain = base * ramp(CFG["z_band_lo_hz"], 2 * CFG["z_band_lo_hz"]) * (
+        CFG["z_gain"] + (CFG["z_gain_hi"] - CFG["z_gain"]) * ramp(split / 1.5, split * 1.5))
 
     p = np.empty((n, 3))
     buf = np.zeros(nfft)

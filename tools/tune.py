@@ -26,6 +26,17 @@ def load(seq_dir):
     return ts, imu
 
 
+def est_poses(ts, imu):
+    """Poses at every input row, the same way main.py writes them."""
+    model = est.estimate(ts, imu.copy())
+    if model is None:
+        pos = np.zeros((len(ts), 3))
+        quat = np.tile([0.0, 0.0, 0.0, 1.0], (len(ts), 1))
+        return pos, quat
+    t = (ts - ts[0]) * 1e-9
+    return est.poses(t, model, est.coast_state(model))
+
+
 def run(sets, overrides, cache):
     est.CFG.update(overrides)
     rows = []
@@ -36,7 +47,7 @@ def run(sets, overrides, cache):
             if key not in cache:
                 cache[key] = load(seq) + (np.loadtxt(ROOT / "data/clean" / seq.name / "gt.tum"),)
             ts, imu, gt = cache[key]
-            pos, quat = est.estimate(ts, imu.copy())
+            pos, quat = est_poses(ts, imu)
             e = np.column_stack([ts * 1e-9, pos, quat])
             m = metrics(e, gt, ts, imu, 1.0)
             rows.append((s, seq.name, m))

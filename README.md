@@ -23,7 +23,7 @@ exactly one pose per input row and the input timestamps copied digit for digit
 | attitude | gyro integrated at full rate with the bias from the first 1.5 s, then the tilt pulled back to gravity using a 30 s average of world acceleration, separately between long gaps | stops tilt drift without erasing real motion |
 | position | world acceleration averaged to 20 Hz, gravity removed, double-integrated in the frequency domain inside a band-pass | slow drift from bias and tilt error never builds up |
 | shrink | horizontal gain 0.25 below 0.08 Hz and 0.9 above, height gain 0.3; position faded towards zero where the gyro is mostly noise | a path that is too big costs more than one that is too small |
-| blind 5 s | coast for a moment on the last velocity, then return to the path centre | the sensor gives nothing there |
+| blind 5 s | coast for a moment on the last velocity, then head for the estimated start point | every practice recording ends within 0.45 m of where it began |
 | write | poses interpolated onto every input timestamp, 1024 rows at a time | memory |
 
 The idea behind the shrink: with an IMU alone, slow horizontal motion cannot be
@@ -48,7 +48,10 @@ second of data. Full rows are in `results/results.csv`.
 
 Known limits:
 
-- The blind 5 s is about as good as stay-still, not better.
+- The blind 5 s is about as good as stay-still: 0.98 of it on average over 24
+  runs, worst 1.04. Holding the true last position would be 3 to 15 times
+  better, but an IMU alone cannot place the end of the path that well, and
+  plain integration from the still start is already 0.5 to 3 m off after 10 s.
 - A 3 s file takes about 30 ms per second, nearly all of it the NumPy import.
 - About 2 MB of tracemalloc peak is Python compiling the script itself, on any input.
 - Tuning: `python tools/tune.py key=value ...` scores settings in-process.

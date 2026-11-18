@@ -9,12 +9,16 @@ Pipeline
     1. read      stream the CSV into compact float32 arrays
     2. clean     drop duplicate, stuck and spiked rows, find the dead ending
     3. resample  valid rows onto a uniform grid, gaps bridged by interpolation
-    4. attitude  integrate the gyro at full rate, then pull the tilt back to
+    4. attitude  gyro bias and initial tilt from the still stretch at the start,
+                 gyro integrated at full rate, then the tilt pulled back to
                  gravity offline using a long average of world acceleration
+                 (shorter where the gyro is noisy, never across a long gap)
     5. position  world acceleration averaged down to 20 Hz, double-integrated
                  in the frequency domain inside a band-pass, so slow drift from
-                 bias and tilt error never builds up
-    6. blind     after the sensor dies, coast on the last velocity and slow down
+                 bias and tilt error never builds up; slow horizontal motion is
+                 shrunk hardest, and everything fades where the gyro is noise
+    6. blind     after the sensor dies, coast briefly, then head for the
+                 estimated start point (the practice flights end where they began)
     7. write     interpolate poses onto every input timestamp, chunk by chunk
 
 Memory stays small because nothing is held per input row except the timestamps

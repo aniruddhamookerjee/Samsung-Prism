@@ -46,7 +46,9 @@ CFG = {
     "z_gain": 0.3,         # vertical shrink
     "z_band_lo_hz": 0.02,  # vertical pass band starts here
     "coast_tau_s": 0.6,    # blind segment: velocity decays with this time constant
-    "return_tau_s": 0.25,  # blind segment: drift back to the path centre with this one
+    "return_tau_s": 1.0,   # blind segment: move to the target with this time constant
+    "blind_home": 1.0,     # blind target: 0 = path centre, 1 = estimated start point
+    "home_s": 2.0,         # the start point is the mean over this many seconds
     "pos_hz": 20.0,        # rate of the position work
     "long_gap_s": 0.3,     # a dropout longer than this splits the attitude fix
     "gyro_noise_ref": 0.35,  # rad/s of sample-to-sample gyro jitter where trust halves
@@ -425,7 +427,11 @@ def poses(tc, model, v_end):
         tau = CFG["coast_tau_s"]
         k = tau * (1.0 - np.exp(-dt / tau)) if tau > 0 else np.zeros(len(dt))
         back = np.exp(-dt / CFG["return_tau_s"])[:, None]
-        pos[after] = p[-1] * back + k[:, None] * v_end
+        # practice flights end where they began (landing pad, loop), so head
+        # for a blend of the estimated start point and the path centre
+        n0 = max(1, min(len(p), int(CFG["home_s"] * CFG["pos_hz"])))
+        target = CFG["blind_home"] * p[:n0].mean(axis=0)
+        pos[after] = target + (p[-1] - target) * back + k[:, None] * v_end
         quat[after] = q[-1]
     quat /= np.linalg.norm(quat, axis=1, keepdims=True)
     return pos, quat

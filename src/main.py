@@ -41,6 +41,7 @@ OUT_CHUNK = 1024
 CFG = {
     "calib_s": 2.0,        # longest start window used for gyro bias and initial tilt,
                            # cut short as soon as the device moves
+    "still_acc_std": 1.0,  # m/s^2 of accel jitter still counted as standing (motors idling)
     "tilt_window_s": 30.0, # averaging window for the gravity direction
     "tilt_window_noisy_s": 8.0,   # the same where the gyro is mostly noise
     "band_lo_hz": 0.02,    # position keeps motion above this frequency ...
@@ -363,7 +364,7 @@ def still_prefix(g, fs):
     while n + w <= limit:
         x = g[n:n + w].astype(np.float64)
         sd = x.std(axis=0)
-        if math.sqrt(float((sd[0:3] ** 2).sum())) > 0.05 or math.sqrt(float((sd[3:6] ** 2).sum())) > 0.3:
+        if math.sqrt(float((sd[0:3] ** 2).sum())) > 0.05 or math.sqrt(float((sd[3:6] ** 2).sum())) > CFG["still_acc_std"]:
             break
         n += w
     return n

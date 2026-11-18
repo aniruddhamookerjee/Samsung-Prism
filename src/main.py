@@ -9,12 +9,16 @@ Pipeline
     1. read      stream the CSV into compact float32 arrays
     2. clean     drop duplicate, stuck and spiked rows, find the dead ending
     3. resample  valid rows onto a uniform grid, gaps bridged by interpolation
-    4. attitude  integrate the gyro at full rate, then pull the tilt back to
+    4. attitude  gyro bias and initial tilt from the still stretch at the start,
+                 gyro integrated at full rate, then the tilt pulled back to
                  gravity offline using a long average of world acceleration
+                 (shorter where the gyro is noisy, never across a long gap)
     5. position  world acceleration averaged down to 20 Hz, double-integrated
                  in the frequency domain inside a band-pass, so slow drift from
-                 bias and tilt error never builds up
-    6. blind     after the sensor dies, coast on the last velocity and slow down
+                 bias and tilt error never builds up; slow horizontal motion is
+                 shrunk hardest, and everything fades where the gyro is noise
+    6. blind     after the sensor dies, coast briefly, then head for the
+                 estimated start point (the practice flights end where they began)
     7. write     interpolate poses onto every input timestamp, chunk by chunk
 
 Memory stays small because nothing is held per input row except the timestamps
@@ -37,7 +41,15 @@ OUT_CHUNK = 1024
 CFG = {
     "calib_s": 2.0,        # longest start window used for gyro bias and initial tilt,
                            # cut short as soon as the device moves
+    "bias_iters": 4,       # rounds of gyro-bias fitting from the tilt drift (0 = off)
+    "bias_min": 0.03,      # rad/s: a smaller fitted bias is noise, not bias (TUM-VI fits 0.013 at most)
+    "bias_settle": 0.01,   # rad/s: the last round must change the bias less than this
+    "bias_fit_always": 0,  # 0 = only when there is no still start to read the bias from
+    "bias_ridge": 1e-3,    # pulls weakly seen bias components towards no change
+    "bias_max": 0.2,       # rad/s, largest correction one round may make
+    "still_acc_std": 1.0,  # m/s^2 of accel jitter still counted as standing (motors idling)
     "tilt_window_s": 30.0, # averaging window for the gravity direction
+    "tilt_window_noisy_s": 8.0,   # the same where the gyro is mostly noise
     "band_lo_hz": 0.02,    # position keeps motion above this frequency ...
     "band_hi_hz": 0.04,    # ... fully above this one, with a smooth ramp between
     "lp_hz": 3.0,          # above this, acceleration is vibration
@@ -358,10 +370,59 @@ def still_prefix(g, fs):
     while n + w <= limit:
         x = g[n:n + w].astype(np.float64)
         sd = x.std(axis=0)
-        if math.sqrt(float((sd[0:3] ** 2).sum())) > 0.05 or math.sqrt(float((sd[3:6] ** 2).sum())) > 0.3:
+        if math.sqrt(float((sd[0:3] ** 2).sum())) > 0.05 or math.sqrt(float((sd[3:6] ** 2).sum())) > CFG["still_acc_std"]:
             break
         n += w
     return n
+
+
+def fit_bias(q, g, fs, d, bgap, seg):
+    """Gyro bias left over in q, read from how fast its tilt drifts.
+
+    A body-frame bias error b makes the integrated attitude drift away from
+    gravity at R(t) b (world frame, horizontal part). The tilt correction
+    measures that drift as phi(t), so phi(t) = phi0 - integral(R b dt), with a
+    fresh phi0 after every long gap. Linear least squares in b, both sides
+    smoothed alike. Rotating about different body axes over the recording is
+    what makes all three components visible; a small ridge keeps the poorly
+    seen ones near zero.
+    """
+    nb = len(q) // d
+    if nb < 20:
+        return np.zeros(3)
+    win = max(int(CFG["tilt_window_s"] * fs / d), 1)
+    w = (~bgap).astype(float)
+    up = smooth_segments(block_world_acc(q, g[:, 3:6], d), win, seg, w)
+    c = arc_to_z(up)
+    phi = 2.0 * c[:, 0:2] / np.maximum(c[:, 3:4], 1e-6)
+
+    qb = q[d // 2::d][:nb].astype(np.float64)
+    x, y, z, wq = qb[:, 0], qb[:, 1], qb[:, 2], qb[:, 3]
+    rows = np.stack([1 - 2 * (y * y + z * z), 2 * (x * y - z * wq), 2 * (x * z + y * wq),
+                     2 * (x * y + z * wq), 1 - 2 * (x * x + z * z), 2 * (y * z - x * wq)], axis=1)
+    m = np.cumsum(rows, axis=0) * (d / fs)
+    m = smooth_segments(m, win, seg, w)
+
+    nseg = int(seg.max()) + 1 if len(seg) else 1
+    k = 2 * nseg + 3
+    ata = np.zeros((k, k))
+    atb = np.zeros(k)
+    for ax in range(2):
+        a = np.zeros((nb, k))
+        a[np.arange(nb), 2 * seg + ax] = 1.0
+        a[:, 2 * nseg:] = -m[:, 3 * ax:3 * ax + 3]
+        aw = a * w[:, None]
+        ata += aw.T @ a
+        atb += aw.T @ phi[:, ax]
+    ridge = CFG["bias_ridge"] * w.sum() * (d / fs) ** 2 * win ** 2
+    ata[2 * nseg:, 2 * nseg:] += ridge * np.eye(3)
+    try:
+        sol = np.linalg.solve(ata, atb)
+    except np.linalg.LinAlgError:
+        return np.zeros(3)
+    db = sol[2 * nseg:]
+    lim = CFG["bias_max"]
+    return np.clip(db, -lim, lim)
 
 
 def attitude(g, fs, d, calib_n, bgap, seg):
@@ -369,13 +430,38 @@ def attitude(g, fs, d, calib_n, bgap, seg):
     head = max(calib_n, min(int(0.25 * fs), len(g)), 1)
     q0 = arc_to_z(g[:head, 3:6].astype(np.float64).mean(axis=0, keepdims=True))[0]
     q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+    # no still start to read the bias from: fit it from the tilt drift, and
+    # keep the fit only if it settles on a plausible value
+    rounds = int(CFG["bias_iters"]) if (calib_n == 0 or CFG["bias_fit_always"]) else 0
+    if rounds:
+        start = bias.copy()
+        db = np.zeros(3)
+        for _ in range(rounds):
+            db = fit_bias(q, g, fs, d, bgap, seg)
+            bias = bias + db
+            q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+        settled = float(np.abs(db).max()) < CFG["bias_settle"]
+        size = float(np.sqrt((bias * bias).sum()))
+        plausible = float(np.abs(bias).max()) < CFG["bias_max"] * 0.75 and size > CFG["bias_min"]
+        if not (settled and plausible):
+            bias = start
+            q = integrate_gyro(g[:, 0:3], q0, fs, bias)
 
     # offline tilt correction: averaged over tens of seconds, world acceleration
     # is gravity alone, so rotate each pose until that average points up
+    # where the gyro is mostly noise its bias wanders faster, so a shorter
+    # window is blended in there
     if len(q) >= d:
         win = max(int(CFG["tilt_window_s"] * fs / d), 1)
+        short = max(int(CFG["tilt_window_noisy_s"] * fs / d), 1)
+        w = (~bgap).astype(float)
+        trust = gyro_quality(g[:, 0:3], d)[:, None]
         for _ in range(2):
-            up = smooth_segments(block_world_acc(q, g[:, 3:6], d), win, seg, (~bgap).astype(float))
+            acc_w = block_world_acc(q, g[:, 3:6], d)
+            up = smooth_segments(acc_w, win, seg, w)
+            if trust.min() < 0.98:
+                up = trust * up + (1.0 - trust) * smooth_segments(acc_w, short, seg, w)
+            del acc_w
             apply_correction(q, arc_to_z(up), d)
     return q
 
@@ -533,11 +619,22 @@ def estimate(ts, imu):
     return {"grid0": grid0, "fs": fs, "q": q, "pt": pt, "p": p}
 
 
+USAGE = """usage: python main.py <imu csv | folder | zip> [output txt]
+
+Reads a degraded EuRoC IMU recording (imu0/data.csv: timestamp ns, gyro rad/s,
+accel m/s^2) and writes one TUM pose per input row:
+    timestamp tx ty tz qx qy qz qw
+The output defaults to estimated_trajectory.txt in the current folder."""
+
+
 def main(argv):
-    if len(argv) < 2:
-        raise SystemExit("usage: python main.py <imu csv | folder | zip> [output txt]")
+    if len(argv) < 2 or argv[1] in ("-h", "--help"):
+        print(USAGE)
+        return
     src = argv[1]
     dst = argv[2] if len(argv) > 2 else "estimated_trajectory.txt"
+    if not os.path.exists(src):
+        raise SystemExit(f"input not found: {src}\n\n{USAGE}")
     ts, imu = read_imu(src)
     box = [imu]
     del imu

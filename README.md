@@ -48,6 +48,30 @@ error is 0.98 of stay-still on average. Peak memory is 2.1 to 2.6 MB
 Full rows are in `results/results.csv`. `python tools/plot_path.py
 data/degraded/tumvi_room1` draws the estimate against the ground truth.
 
+### Held-out check (recordings never used for tuning)
+
+| recording | stay-still ate | ours ate | ours, raw column order | stay-still blind | ours blind |
+| --- | --- | --- | --- | --- | --- |
+| V2_02_medium | 2.12 | 1.75 | 1.77 | 2.69 | 2.87 |
+| MH_03_medium | 3.59 | 3.06 | 3.38 | 3.09 | 3.08 |
+| tumvi_room2 | 1.22 | 0.33 | 0.35 | 0.72 | 0.66 |
+| tumvi_room3 | 1.25 | 0.70 | 0.64 | 0.70 | 0.80 |
+| tumvi_room4 | 1.08 | 0.73 | 0.76 | 0.78 | 0.75 |
+
+All 10 runs beat stay-still on the path (0.65 of it on average). This check
+found two real bugs, both fixed: idling motors on the pad were taken for
+movement, so the EuRoC gyro bias (about 0.08 rad/s) was never removed; and a
+file that starts mid-flight had no bias estimate at all. Cutting the first 20 s
+off five EuRoC files now gives 0.97, 0.75, 0.87 and 0.99 of stay-still; MH_03
+stays at 1.43 because its bias fit does not settle and the estimator falls back
+to no fit. The blind 5 s stays within about 0.1 to 0.2 m of stay-still.
+
+To repeat it: `python tools/fetch_euroc.py V2_02_medium MH_03_medium --out
+data/holdout_clean`, `python tools/fetch_tumvi.py room2 room3 room4 --out
+data/holdout_clean`, `python tools/prepare_data.py --clean data/holdout_clean
+--out data/holdout`, then `python tools/score.py src/main.py --label holdout
+--data data/holdout/degraded --gt data/holdout_clean`.
+
 Known limits:
 
 - The blind 5 s is about as good as stay-still: 0.98 of it on average over 24

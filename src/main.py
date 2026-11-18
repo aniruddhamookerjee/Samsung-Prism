@@ -38,6 +38,7 @@ CFG = {
     "calib_s": 2.0,        # longest start window used for gyro bias and initial tilt,
                            # cut short as soon as the device moves
     "tilt_window_s": 30.0, # averaging window for the gravity direction
+    "tilt_window_noisy_s": 8.0,   # the same where the gyro is mostly noise
     "band_lo_hz": 0.02,    # position keeps motion above this frequency ...
     "band_hi_hz": 0.04,    # ... fully above this one, with a smooth ramp between
     "lp_hz": 3.0,          # above this, acceleration is vibration
@@ -372,10 +373,19 @@ def attitude(g, fs, d, calib_n, bgap, seg):
 
     # offline tilt correction: averaged over tens of seconds, world acceleration
     # is gravity alone, so rotate each pose until that average points up
+    # where the gyro is mostly noise its bias wanders faster, so a shorter
+    # window is blended in there
     if len(q) >= d:
         win = max(int(CFG["tilt_window_s"] * fs / d), 1)
+        short = max(int(CFG["tilt_window_noisy_s"] * fs / d), 1)
+        w = (~bgap).astype(float)
+        trust = gyro_quality(g[:, 0:3], d)[:, None]
         for _ in range(2):
-            up = smooth_segments(block_world_acc(q, g[:, 3:6], d), win, seg, (~bgap).astype(float))
+            acc_w = block_world_acc(q, g[:, 3:6], d)
+            up = smooth_segments(acc_w, win, seg, w)
+            if trust.min() < 0.98:
+                up = trust * up + (1.0 - trust) * smooth_segments(acc_w, short, seg, w)
+            del acc_w
             apply_correction(q, arc_to_z(up), d)
     return q
 

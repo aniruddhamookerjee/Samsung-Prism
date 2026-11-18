@@ -619,11 +619,22 @@ def estimate(ts, imu):
     return {"grid0": grid0, "fs": fs, "q": q, "pt": pt, "p": p}
 
 
+USAGE = """usage: python main.py <imu csv | folder | zip> [output txt]
+
+Reads a degraded EuRoC IMU recording (imu0/data.csv: timestamp ns, gyro rad/s,
+accel m/s^2) and writes one TUM pose per input row:
+    timestamp tx ty tz qx qy qz qw
+The output defaults to estimated_trajectory.txt in the current folder."""
+
+
 def main(argv):
-    if len(argv) < 2:
-        raise SystemExit("usage: python main.py <imu csv | folder | zip> [output txt]")
+    if len(argv) < 2 or argv[1] in ("-h", "--help"):
+        print(USAGE)
+        return
     src = argv[1]
     dst = argv[2] if len(argv) > 2 else "estimated_trajectory.txt"
+    if not os.path.exists(src):
+        raise SystemExit(f"input not found: {src}\n\n{USAGE}")
     ts, imu = read_imu(src)
     box = [imu]
     del imu

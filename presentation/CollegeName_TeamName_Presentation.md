@@ -83,12 +83,12 @@
   - **Rotation Error**: **9.721°** across the entire 141-second trajectory.
   - **Peak Memory**: **3.06 MB** (Budget: 8.0 MB — utilizing only 38% of allowed memory).
   - **Processing Speed**: **2.07 ms/s** (Budget: 20.0 ms/s — **9.7x faster than required limit**).
-- **Across all drone and handheld runs**: path error 0.70x and blind 5 s error 0.64x of stay-still over 24 tuning runs; 0.72x path over 15 held-out runs, none worse than stay-still.
+- **Across all drone and handheld runs**: path error 0.65x and blind 5 s error 0.58x of stay-still over 24 tuning runs; 0.69x path over 15 held-out runs and 0.72x over 10 runs on five recordings never used for tuning.
 
 ---
 
 ### Slide 6: Key Differentiators & Technical Innovations
-1. **Rotor Drag as a Velocity Sensor (our key idea)**: A multirotor's thrust is along one body axis, so the other two accelerometer axes see only rotor drag, $a = -k\,v$. Against ground truth every EuRoC flight fits the same $k = 0.18 \dots 0.22\text{ s}^{-1}$ (correlation up to 0.98). Velocity integrated once drifts far less than acceleration integrated twice: MH_04 path error 6.50 m to 5.30 m, blind 5 s error 3.67 m to 1.44 m. Detected automatically from motor vibration, so handheld data is untouched.
+1. **Rotor Drag as a Velocity Sensor (our key idea)**: A multirotor's thrust is along one body axis, so the other two accelerometer axes see only rotor drag, $a = -k\,v$. Against ground truth every EuRoC flight fits the same $k = 0.18 \dots 0.22\text{ s}^{-1}$ (correlation up to 0.98). Velocity integrated once drifts far less than acceleration integrated twice: Drag is read perpendicular to the measured thrust direction (the EuRoC IMU is mounted 20 deg off it), and the velocity is zero where motor vibration drops to idle (drone on the pad). MH_04 path error 6.50 m to 4.30 m, blind 5 s error 3.67 m to 0.91 m. Detected automatically from motor vibration, so handheld data is untouched.
 2. **Frequency-Domain Double Integration**: Traditional time-domain Riemann integration ($\iint a\,dt^2$) quadratically explodes with any minute tilt bias ($1^\circ \text{ tilt} \to 0.17\text{ m/s}^2 \to 150\text{ m}$ drift in 30s). Our spectral integration filters out the DC drift band while preserving dynamic maneuvers.
 3. **Asymmetric Gain Optimization**: Recognizes that horizontal acceleration is highly sensitive to tilt errors, whereas vertical acceleration is bounded by gravity. Applies horizontal gain ($0.25$) and vertical gain ($0.90$), preventing false lateral wander.
 4. **Adaptive Gyro Jamming Trust Weighting**: Dynamically computes sample-to-sample jitter $\Delta\omega$; as jamming intensifies, position confidence automatically fades toward safe bounds.

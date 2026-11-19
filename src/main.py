@@ -83,6 +83,7 @@ CFG = {
     "drag_fc_keep": 1,      # ... on top of the drag_lo_hz ramp, never below it
     "drag_fc_scale": 0.7,   # ... scaled by this
     "home_fc_hz": 0.0,      # the blind target keeps the plain ramp
+    "gap_not_ground": 1, "drag_bridge": 1,  # dropouts are not ground; drag velocity bridged across them
     "home_floor_z": 1,       # drone: blind target height = floor level (they land where they took off)
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
     "drag_gain": 0.65,     # shrink, for the same reason as gain
@@ -555,6 +556,10 @@ def drag_velocity(q, acc, d, fs, bgap):
     # not drag: there the velocity is zero, and the flight is what calibrates
     buzz = smooth(buzz[:, None], max(int(CFG["ground_smooth_s"] * fs), 1))[:, 0]
     ground = buzz < CFG["ground_buzz"] * median(buzz[ok])
+    if CFG["gap_not_ground"]:
+        # inside a dropout the samples are interpolated, so they carry no
+        # motor buzz: that is missing data, not the drone sitting on the pad
+        ground &= ~bgap[:nb]
     fly = ok & ~ground
     if fly.sum() < int(20 * fs):
         return None
@@ -582,6 +587,13 @@ def drag_velocity(q, acc, d, fs, bgap):
         c = np.linalg.solve(A.T @ A + lam * np.eye(2), A.T @ b + lam * c)
     vbody = -((x - c) / CFG["drag_k"]) @ np.stack([e1, e2])
     vbody[~fly] = 0.0
+    if CFG["gap_not_ground"] and CFG["drag_bridge"]:
+        # across a dropout, bridge the velocity linearly between its edges
+        gb = bgap[:nb] & ~ground
+        if gb.any() and fly.any():
+            i = np.arange(nb)
+            for k in range(3):
+                vbody[gb, k] = np.interp(i[gb], i[fly], vbody[fly, k])
     return qrot(qb, vbody), ground
 
 

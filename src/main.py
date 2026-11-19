@@ -65,7 +65,7 @@ CFG = {
     "z_gain": 0.3,         # vertical shrink below split_hz
     "z_gain_hi": 0.9,      # vertical shrink above split_hz
     "z_band_lo_hz": 0.02,  # vertical pass band starts here
-    "coast_tau_s": 0.6,    # blind segment: velocity decays with this time constant
+    "coast_tau_s": 0.3,    # blind segment: velocity decays with this time constant
     "return_tau_s": 1.0,   # blind segment: move to the target with this time constant
     "blind_home": 1.0,     # blind target: 0 = path centre, 1 = estimated start point
     "home_raw_drag": 1,    # blind target from the track without ground detection

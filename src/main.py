@@ -47,6 +47,7 @@ OUT_CHUNK = 1024
 CFG = {
     "calib_s": 2.0,        # longest start window used for gyro bias and initial tilt,
                            # cut short as soon as the device moves
+    "bias_select": 1, "bias_select_margin": 0.8,  # no still start: also fit from the median gyro, keep it if tilt drift drops 20%
     "bias_iters": 4,       # rounds of gyro-bias fitting from the tilt drift (0 = off)
     "bias_min": 0.03,      # rad/s: a smaller fitted bias is noise, not bias (TUM-VI fits 0.013 at most)
     "bias_settle": 0.01,   # rad/s: the last round must change the bias less than this
@@ -360,7 +361,7 @@ def heading_trust(gyro, d, bgap, fs):
     gb = gyro[:nb * d].reshape(nb, d, 3).mean(axis=1)
     ok = ~bgap[:nb]
     gb = smooth(gb, max(int(0.5 * fs / d), 1))[ok]
-    rate = float(np.sqrt(((gb - np.median(gb, axis=0)) ** 2).sum(axis=1).mean()))
+    rate = float(np.sqrt(((gb - np.array([median(gb[:, k]) for k in range(3)])) ** 2).sum(axis=1).mean()))
     var = np.zeros(nb)
     i = 0
     g = bgap[:nb]
@@ -494,27 +495,65 @@ def fit_bias(q, g, fs, d, bgap, seg):
     return np.clip(db, -lim, lim)
 
 
+def tilt_drift(q, g, fs, d, bgap, seg):
+    """How far the integrated attitude wanders from gravity (rms tilt, rad):
+    the right gyro bias leaves the least for the tilt correction to undo."""
+    nb = len(q) // d
+    win = max(int(CFG["tilt_window_s"] * fs / d), 1)
+    w = (~bgap[:nb]).astype(float)
+    up = smooth_segments(block_world_acc(q, g[:, 3:6], d), win, seg[:nb], w)
+    up /= np.maximum(np.linalg.norm(up, axis=1, keepdims=True), 1e-9)
+    tilt = np.arccos(np.clip(up[:, 2], -1.0, 1.0))
+    return float(np.sqrt((tilt ** 2 * w).sum() / max(w.sum(), 1.0)))
+
+
+def fitted_bias(g, fs, d, bgap, seg, q0, start, rounds):
+    """Gyro bias fitted from the tilt drift, starting at start; the start is
+    kept when the fit does not settle on a plausible value."""
+    bias = start.copy()
+    q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+    db = np.zeros(3)
+    for _ in range(rounds):
+        db = fit_bias(q, g, fs, d, bgap, seg)
+        bias = bias + db
+        q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+    settled = float(np.abs(db).max()) < CFG["bias_settle"]
+    size = float(np.sqrt((bias * bias).sum()))
+    plausible = float(np.abs(bias).max()) < CFG["bias_max"] * 0.75 and size > CFG["bias_min"]
+    if not (settled and plausible):
+        bias = start.copy()
+        q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+    return bias, q
+
+
 def attitude(g, fs, d, calib_n, bgap, seg):
     bias = g[:calib_n, 0:3].astype(np.float64).mean(axis=0) if calib_n > 0 else np.zeros(3)
     head = max(calib_n, min(int(0.25 * fs), len(g)), 1)
     q0 = arc_to_z(g[:head, 3:6].astype(np.float64).mean(axis=0, keepdims=True))[0]
-    q = integrate_gyro(g[:, 0:3], q0, fs, bias)
     # no still start to read the bias from: fit it from the tilt drift, and
     # keep the fit only if it settles on a plausible value
     rounds = int(CFG["bias_iters"]) if (calib_n == 0 or CFG["bias_fit_always"]) else 0
     if rounds:
-        start = bias.copy()
-        db = np.zeros(3)
-        for _ in range(rounds):
-            db = fit_bias(q, g, fs, d, bgap, seg)
-            bias = bias + db
-            q = integrate_gyro(g[:, 0:3], q0, fs, bias)
-        settled = float(np.abs(db).max()) < CFG["bias_settle"]
-        size = float(np.sqrt((bias * bias).sum()))
-        plausible = float(np.abs(bias).max()) < CFG["bias_max"] * 0.75 and size > CFG["bias_min"]
-        if not (settled and plausible):
-            bias = start
-            q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+        bias, q = fitted_bias(g, fs, d, bgap, seg, q0, bias, rounds)
+        if calib_n == 0 and CFG["bias_select"]:
+            # the fit can settle in the wrong place; also start it from the
+            # median gyro reading (turns average out, the bias does not) and
+            # keep whichever leaves the least tilt drift
+            sub = g[::max(len(g) // 4000, 1)].astype(np.float64)
+            med = np.array([median(sub[:, k]) for k in range(3)])
+            up = np.array([median(sub[:, k]) for k in range(3, 6)])
+            up /= max(float(np.linalg.norm(up)), 1e-9)
+            del sub
+            best = tilt_drift(q, g, fs, d, bgap, seg)
+            del q                      # one attitude track in memory at a time
+            b2, q = fitted_bias(g, fs, d, bgap, seg, q0, med - (med @ up) * up, rounds)
+            if tilt_drift(q, g, fs, d, bgap, seg) >= best * CFG["bias_select_margin"]:
+                del q
+                q = integrate_gyro(g[:, 0:3], q0, fs, bias)
+            else:
+                bias = b2
+    else:
+        q = integrate_gyro(g[:, 0:3], q0, fs, bias)
 
     # offline tilt correction: averaged over tens of seconds, world acceleration
     # is gravity alone, so rotate each pose until that average points up

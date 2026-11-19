@@ -75,6 +75,7 @@ CFG = {
     "drag_k": 0.2,         # 1/s, rotor drag constant (EuRoC fits 0.18 to 0.22)
     "ground_buzz": 0.6,    # blocks with less than this fraction of the typical motor buzz are on the ground
     "ground_smooth_s": 1.0,
+    "drag_offset_ridge": 0.6,  # >0: side-axis offsets from a zero mean velocity in the room
     "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
     "drag_cross_hz": 0.08, # below this, horizontal position comes from drag velocity
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
@@ -545,13 +546,22 @@ def drag_velocity(q, acc, d, fs, bgap):
     e1 = np.cross(u, np.eye(3)[int(np.argmin(np.abs(u)))])
     e1 /= np.linalg.norm(e1)
     e2 = np.cross(u, e1)
-    vbody = np.zeros((nb, 3))
     sm = max(int(CFG["drag_smooth_s"] * fs), 1)
-    for e in (e1, e2):
-        x = smooth((ab @ e)[:, None], sm)[:, 0]
-        vbody -= ((x - x[fly].mean()) / CFG["drag_k"])[:, None] * e[None, :]
-    vbody[~fly] = 0.0
+    x = np.column_stack([smooth((ab @ e)[:, None], sm)[:, 0] for e in (e1, e2)])
+    c = x[fly].mean(axis=0)
     qb = q[(np.arange(nb) * d + d // 2)].astype(np.float64)
+    if CFG["drag_offset_ridge"] > 0:
+        # the flights end where they began, so the mean velocity in the room
+        # is zero; with the drone turning, that pins the side-axis offsets
+        # better than assuming a zero mean in the drone's own frame
+        w1 = qrot(qb[fly], np.tile(e1, (int(fly.sum()), 1)))[:, :2]
+        w2 = qrot(qb[fly], np.tile(e2, (int(fly.sum()), 1)))[:, :2]
+        A = np.column_stack([w1.mean(axis=0), w2.mean(axis=0)])
+        b = (w1 * x[fly, 0:1] + w2 * x[fly, 1:2]).mean(axis=0)
+        lam = CFG["drag_offset_ridge"]
+        c = np.linalg.solve(A.T @ A + lam * np.eye(2), A.T @ b + lam * c)
+    vbody = -((x - c) / CFG["drag_k"]) @ np.stack([e1, e2])
+    vbody[~fly] = 0.0
     return qrot(qb, vbody), ground
 
 

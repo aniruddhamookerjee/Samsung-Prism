@@ -23,7 +23,8 @@ exactly one pose per input row and the input timestamps copied digit for digit
 | attitude | gyro integrated at full rate with the bias from the first 1.5 s, then the tilt pulled back to gravity using a 30 s average of world acceleration, separately between long gaps | stops tilt drift without erasing real motion |
 | position | world acceleration averaged to 20 Hz, gravity removed, double-integrated in the frequency domain inside a band-pass | slow drift from bias and tilt error never builds up |
 | shrink | horizontal gain 0.25 below 0.08 Hz and 0.9 above, height gain 0.3; position faded towards zero where the gyro is mostly noise | a path that is too big costs more than one that is too small |
-| blind 5 s | coast for a moment on the last velocity, then head for the estimated start point | every practice recording ends within 0.45 m of where it began |
+| rotor drag | on a drone (found from motor buzz in the accelerometer), slow horizontal motion comes from drag instead: the two accelerometer axes across the thrust read -0.2 x velocity, which is velocity measured directly | velocity integrated once drifts far less than acceleration integrated twice |
+| blind 5 s | coast for a moment on the last velocity, then head for the estimated start point, averaged over the first 12 s | every practice recording ends within 0.45 m of where it began |
 | write | poses interpolated onto every input timestamp, 1024 rows at a time | memory |
 
 The idea behind the shrink: with an IMU alone, slow horizontal motion cannot be
@@ -32,39 +33,51 @@ acceleration, metres of error within half a minute). Fast motion and height are
 much better. So the estimate keeps fast motion at almost full size and slow
 horizontal motion at a quarter, and never lets drift accumulate.
 
-### Results (sarthak-v3, metres)
+The rotor-drag step is what sets this apart from plain inertial navigation. A
+multirotor's thrust is along one body axis, so the accelerometer's other two
+axes do not see gravity or thrust at all in flight, only rotor drag, which is
+proportional to the velocity along them. Against the ground truth, every EuRoC
+recording (five flights, two rooms) fits the same constant, 0.18 to 0.22 per
+second, with correlation up to 0.98 on undamaged stretches. Dividing by it gives
+velocity with no integration in it. The estimator switches it on only when the
+accelerometer shows motor vibration (EuRoC 1.1 to 1.9 m/s^2 inside 50 ms
+blocks, handheld TUM-VI 0.2 to 0.4), so handheld recordings are untouched.
+
+### Results (sarthak-v4, metres)
 
 | recording | stay-still ate | ours ate | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.23 | 1.04 | 1.06 |
-| V1_03_difficult | 1.58 | 1.34 | 1.27 | 1.25 |
-| MH_04_difficult | 6.81 | 6.50 | 3.85 | 3.65 |
+| V1_02_medium | 1.78 | 1.15 | 1.04 | 0.54 |
+| V1_03_difficult | 1.58 | 1.27 | 1.27 | 0.96 |
+| MH_04_difficult | 6.81 | 5.30 | 3.85 | 1.44 |
 | tumvi_room1 | 1.00 | 0.35 | 0.63 | 0.65 |
 
 Across the default, raw-order and four harsher stress sets (24 runs), the path
-error is 0.77 of stay-still on average and below it in every run; the blind
-error is 0.98 of stay-still on average. Peak memory is 2.1 to 2.6 MB
-(tracemalloc, after `import numpy`), runtime 1.4 to 2.3 ms per second of data.
-Full rows are in `results/results.csv`. `python tools/plot_path.py
-data/degraded/tumvi_room1` draws the estimate against the ground truth.
+error is 0.70 of stay-still on average (v3: 0.77) and below it in every run; the
+blind error is 0.64 of stay-still (v3: 0.98). Peak memory is 2.6 to 4.3 MB
+(tracemalloc, after `import numpy`), runtime 1.4 to 2.9 ms per second of data.
+`python tools/evalall.py` prints these ratios for every local set at once,
+`python tools/plot_path.py data/degraded/tumvi_room1` draws the estimate
+against the ground truth.
 
 ### Held-out check (recordings never used for tuning)
 
 | recording | stay-still ate | ours ate | ours, raw column order | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- | --- |
-| V2_02_medium | 2.12 | 1.75 | 1.77 | 2.69 | 2.87 |
-| MH_03_medium | 3.59 | 3.06 | 3.38 | 3.09 | 3.08 |
-| tumvi_room2 | 1.22 | 0.33 | 0.35 | 0.72 | 0.66 |
-| tumvi_room3 | 1.25 | 0.70 | 0.64 | 0.70 | 0.80 |
-| tumvi_room4 | 1.08 | 0.73 | 0.76 | 0.78 | 0.75 |
+| V2_02_medium | 2.12 | 1.64 | 1.67 | 2.69 | 2.79 |
+| MH_03_medium | 3.59 | 3.28 | 3.43 | 3.09 | 1.37 |
+| tumvi_room2 | 1.22 | 0.32 | 0.34 | 0.72 | 0.62 |
+| tumvi_room3 | 1.25 | 0.70 | 0.64 | 0.70 | 0.71 |
+| tumvi_room4 | 1.08 | 0.73 | 0.76 | 0.78 | 0.77 |
 
-All 10 runs beat stay-still on the path (0.65 of it on average). This check
-found two real bugs, both fixed: idling motors on the pad were taken for
-movement, so the EuRoC gyro bias (about 0.08 rad/s) was never removed; and a
-file that starts mid-flight had no bias estimate at all. Cutting the first 20 s
-off five EuRoC files now gives 0.97, 0.75, 0.87 and 0.99 of stay-still; MH_03
-stays at 1.43 because its bias fit does not settle and the estimator falls back
-to no fit. The blind 5 s stays within about 0.1 to 0.2 m of stay-still.
+All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
+start mid-flight, the 15 held-out runs average 0.72 of stay-still on the path
+(none above 1.00) and 0.92 on the blind 5 s. This check found two real bugs,
+both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
+bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight
+had no bias estimate at all. The rotor-drag step was tuned on the first four
+recordings only and then checked here: it took the mid-flight MH_03 file from
+1.43 of stay-still to 0.90.
 
 To repeat it: `python tools/fetch_euroc.py V2_02_medium MH_03_medium --out
 data/holdout_clean`, `python tools/fetch_tumvi.py room2 room3 room4 --out
@@ -74,10 +87,10 @@ data/holdout_clean`, `python tools/prepare_data.py --clean data/holdout_clean
 
 Known limits:
 
-- The blind 5 s is about as good as stay-still: 0.98 of it on average over 24
-  runs, worst 1.04. Holding the true last position would be 3 to 15 times
-  better, but an IMU alone cannot place the end of the path that well, and
-  plain integration from the still start is already 0.5 to 3 m off after 10 s.
+- The blind 5 s relies on the recording ending near where it started. A flight
+  that ends somewhere else (V2_02) gets about stay-still there, no better.
+- Rotor drag needs a multirotor. On handheld data the estimator falls back to
+  the shrunk double integration.
 - A 3 s file takes about 30 ms per second, nearly all of it the NumPy import.
 - About 2.1 MB of tracemalloc peak is Python compiling the script itself, on any input.
 - Tuning: `python tools/tune.py key=value ...` scores settings in-process.

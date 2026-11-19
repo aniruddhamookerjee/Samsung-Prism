@@ -62,7 +62,7 @@ CFG = {
     "lp_hz": 3.0,          # above this, acceleration is vibration
     "gain": 0.15,          # horizontal shrink below split_hz: a too-large path costs more than a small one
     "gain_hi": 1.0,        # horizontal shrink above split_hz
-    "split_hz": 0.065,
+    "split_hz": 0.055,
     "z_gain": 0.3,         # vertical shrink below split_hz
     "z_gain_hi": 0.9,      # vertical shrink above split_hz
     "z_band_lo_hz": 0.02,  # vertical pass band starts here

@@ -86,7 +86,7 @@ The estimator processes telemetry offline in seven sequential stages:
 3. **`resample`**: Interpolates non-uniform timestamps across short gaps onto a steady sampling rate ($f_s \approx 200\text{ Hz}$). Dropout bursts exceeding $0.3\text{ s}$ are marked as unmeasured gaps.
 4. **`attitude`**:
    - Computes initial gyro bias in a quiescent calibration window ($t \le 2.0\text{ s}$).
-   - With no still start (a file that begins mid-flight), fits the gyro bias from how fast the tilt drifts away from gravity, and keeps it only if the fit settles on a plausible value.
+   - With no still start (a file that begins mid-flight), fits the gyro bias from how fast the tilt drifts away from gravity, and keeps it only if the fit settles on a plausible value. The fit also runs from the median gyro reading (its part along gravity removed), and that result is kept when it leaves at least 20% less tilt drift.
    - Integrates angular rates using single-precision unit quaternions.
    - Computes offline tilt correction by observing that the average low-frequency world acceleration vector over $30\text{ s}$ aligns strictly with gravity ($+1g$ vertical).
 5. **`position`**:

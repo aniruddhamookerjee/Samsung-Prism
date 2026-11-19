@@ -496,13 +496,13 @@ def vibration(acc, d):
     nb = len(acc) // d
     if nb < 1:
         return 0.0
-    step = max(nb // 2000, 1)
-    idx = np.arange(0, nb, step)
-    b = acc[:nb * d].reshape(nb, d, 3)[idx].astype(np.float64)
-    b = b[np.any(b != 0, axis=(1, 2))]
-    if len(b) == 0:
-        return 0.0
-    return median(np.sqrt(((b - b.mean(axis=1, keepdims=True)) ** 2).sum(axis=2).mean(axis=1)))
+    idx = np.arange(0, nb, max(nb // 400, 1))
+    spread = []
+    for i in idx.tolist():
+        b = acc[i * d:(i + 1) * d]
+        if b.any():
+            spread.append(float(np.sqrt(((b - b.mean(axis=0)) ** 2).sum(axis=1).mean())))
+    return median(np.array(spread)) if spread else 0.0
 
 
 def drag_velocity(q, acc, d, fs, bgap):

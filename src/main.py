@@ -56,12 +56,12 @@ CFG = {
     "still_acc_std": 1.0,  # m/s^2 of accel jitter still counted as standing (motors idling)
     "tilt_window_s": 30.0, # averaging window for the gravity direction
     "tilt_window_noisy_s": 8.0,   # the same where the gyro is mostly noise
-    "band_lo_hz": 0.02,    # position keeps motion above this frequency ...
-    "band_hi_hz": 0.04,    # ... fully above this one, with a smooth ramp between
+    "band_lo_hz": 0.03,    # position keeps motion above this frequency ...
+    "band_hi_hz": 0.05,    # ... fully above this one, with a smooth ramp between
     "lp_hz": 3.0,          # above this, acceleration is vibration
-    "gain": 0.25,          # horizontal shrink below split_hz: a too-large path costs more than a small one
-    "gain_hi": 0.9,        # horizontal shrink above split_hz
-    "split_hz": 0.08,
+    "gain": 0.15,          # horizontal shrink below split_hz: a too-large path costs more than a small one
+    "gain_hi": 1.0,        # horizontal shrink above split_hz
+    "split_hz": 0.065,
     "z_gain": 0.3,         # vertical shrink below split_hz
     "z_gain_hi": 0.9,      # vertical shrink above split_hz
     "z_band_lo_hz": 0.02,  # vertical pass band starts here

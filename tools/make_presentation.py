@@ -189,7 +189,7 @@ def create_deck(output_path=ROOT / "presentation" / "CollegeName_TeamName.pptx")
         ("Attitude:", "gyro integration with the bias from the still start (or fitted from the tilt drift), tilt pinned to gravity averaged over 30 s."),
         ("Position in the frequency domain:", "gains fitted per frequency band against motion-capture ground truth: fast motion kept, slow motion shrunk where tilt error dominates."),
         ("Blind 5 s:", "coast 0.3 s on the last velocity, then head for the take-off point (drones land where they took off)."),
-        ("Lean:", "numpy only, array.array input buffers, 20 Hz position work, chunked output: about 3 MB and 2 to 3 ms per second of data."),
+        ("Lean:", "numpy only, array.array input buffers, 20 Hz position work, chunked output: 3 to 5 MB and 2 to 3.5 ms per second of data."),
     ], size=17)
 
     # 4. architecture
@@ -238,7 +238,7 @@ def create_deck(output_path=ROOT / "presentation" / "CollegeName_TeamName.pptx")
         ("49 runs, 3 groups (path / blind, x stay-still):", "tuning 0.62 / 0.58; held-out 0.68 / 0.90; five recordings never used for tuning 0.64 / 0.73."),
         ("Submitted file (tumvi_room1):", f"dropout windows {acc['dropout_gap_rmse_meters']:.2f} m (stay-still 0.87), "
                                           f"1 s drift {acc['rpe_1s_meters']:.2f} m, rotation {acc['rotation_rmse_degrees']:.1f} deg."),
-        ("Resources:", f"peak memory {perf['peak_memory_mb']:.1f} MB of 8, {perf['runtime_ms_per_second']:.1f} ms per second of data of 20."),
+        ("Resources:", f"peak memory {perf['peak_memory_mb']:.1f} MB of 8 (algorithm level, as the FAQ measures), {perf['runtime_ms_per_second']:.1f} ms per second of data of 20."),
     ], size=14)
     picture(s, "MH_04_difficult.png", Inches(8.4), Inches(1.6), w=Inches(4.6))
     picture(s, "tumvi_room1.png", Inches(8.4), Inches(3.6), w=Inches(4.6))
@@ -285,13 +285,12 @@ def create_deck(output_path=ROOT / "presentation" / "CollegeName_TeamName.pptx")
         ("Edge cases:", "empty, one-row, 3 s, all-zero and blind-only files: no crashes, row count and timestamps always exact."),
         ("Held out honestly:", "settings tuned on 4 recordings, checked on 3 more, then on 5 fetched afterwards."),
     ], size=16)
-    rows = [["check", "result"],
-            ["harsh (2x damage), tumvi_room1", "0.49 m path"],
-            ["2 s dropouts, tumvi_room1", "0.65 m path"],
-            ["runs worse than stay-still (path)", "1 of 49"],
-            ["peak memory, all real files", "2.8 to 4.4 MB"],
-            ["runtime", "1.4 to 3 ms / s"]]
-    table(s, Inches(7.2), Inches(1.8), Inches(5.5), rows, [3.4, 2.1], size=14, highlight_col=1)
+    picture(s, "results_stress.png", Inches(6.9), Inches(1.6), w=Inches(6.0))
+    text(s, Inches(6.9), Inches(4.5), Inches(6.0), Inches(1.6), [
+        ("Peak memory 2.8 to 5.3 MB on every practice and stress run (limit 8),", {}),
+        ("runtime 2.3 to 3.3 ms per second of data (limit 20).", {}),
+        ("Path worse than stay-still: 1 run of 49 (a file cut to start mid-flight).", {"before": 8}),
+    ], size=14, color=DARK)
 
     # 9. thanks
     s = prs.slides.add_slide(blank)

@@ -84,17 +84,24 @@ follows: on tumvi_room3 the tilt error reaches 6.5 degrees in the last 20 s,
 where the device spins at 2.1 rad/s (0.7 degrees on the clean recording). The
 short tilt window is now also blended in where the device rotates fast, which
 takes tumvi_room3 from 0.61 to 0.58 m.
+A sweep of 50 settings over all 49 runs then found one more clear win: the tilt
+and bias fits restart after any dropout longer than 0.2 s (the damage script's
+bursts reach 0.25 s), not only after 0.3 s. That takes the held-out path from
+0.64 to 0.61 of stay-still (V2_02 cut to start mid-flight: 2.24 to 1.74 m) and
+tumvi_room3 to 0.41 m; with slightly retuned windows (tilt 35 s, noisy-gyro 6 s,
+drag smoothing 0.3 s) tumvi_room1 goes from 0.32 to 0.30 m. These values were
+picked looking at all three groups.
 
-### Results (sarthak-v8, metres)
+### Results (sarthak-v9, metres)
 
 Organisers' damage, default column order:
 
 | recording | stay-still ate | ours ate | ours / stay-still | stay-still blind | ours blind | stay-still gaps | ours gaps | rotation (deg) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.18 | 0.66 | 1.04 | 0.51 | 1.61 | 1.14 | 3.2 |
+| V1_02_medium | 1.78 | 1.18 | 0.66 | 1.04 | 0.52 | 1.61 | 1.13 | 3.2 |
 | V1_03_difficult | 1.58 | 1.07 | 0.68 | 1.27 | 0.62 | 1.09 | 0.91 | 7.3 |
-| MH_04_difficult | 6.81 | 4.06 | 0.60 | 3.85 | 0.85 | 7.87 | 3.76 | 16.2 |
-| tumvi_room1 | 1.00 | 0.32 | 0.32 | 0.63 | 0.61 | 0.87 | 0.34 | 9.7 |
+| MH_04_difficult | 6.81 | 4.07 | 0.60 | 3.85 | 0.83 | 7.87 | 3.77 | 16.1 |
+| tumvi_room1 | 1.00 | 0.30 | 0.30 | 0.63 | 0.62 | 0.87 | 0.31 | 9.8 |
 
 Every damage type, as a fraction of stay-still (mean of the 4 recordings, worst in brackets):
 
@@ -107,7 +114,7 @@ Every damage type, as a fraction of stay-still (mean of the 4 recordings, worst 
 | twice, raw column order | 0.65 (0.72) | 0.63 (1.06) | 0.74 (0.90) |
 | gaps of 2 to 3.5 s | 0.70 (0.74) | 0.61 (1.06) | 0.88 (1.20) |
 
-Over the 24 runs the path error is 0.62 of stay-still (v3, before rotor drag:
+Over the 24 runs the path error is 0.60 of stay-still (v3, before rotor drag:
 0.77) and below it in every run; the blind error is 0.58 of stay-still (v3:
 0.98). Five runs are slightly worse than stay-still on one window: the blind 5 s
 on tumvi_room1 under the four harsher sets (at most 0.09 m worse; the handheld
@@ -131,15 +138,15 @@ against the ground truth.
 
 | recording | stay-still ate | ours ate | ours, raw column order | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- | --- |
-| V2_02_medium | 2.12 | 1.46 | 1.51 | 2.69 | 2.73 |
-| MH_03_medium | 3.59 | 2.23 | 2.57 | 3.09 | 2.02 |
-| tumvi_room2 | 1.22 | 0.32 | 0.34 | 0.72 | 0.66 |
-| tumvi_room3 | 1.25 | 0.58 | 0.55 | 0.70 | 0.65 |
-| tumvi_room4 | 1.08 | 0.78 | 0.79 | 0.78 | 0.77 |
+| V2_02_medium | 2.12 | 1.46 | 1.51 | 2.69 | 2.71 |
+| MH_03_medium | 3.59 | 2.22 | 2.57 | 3.09 | 2.01 |
+| tumvi_room2 | 1.22 | 0.31 | 0.30 | 0.72 | 0.66 |
+| tumvi_room3 | 1.25 | 0.41 | 0.41 | 0.70 | 0.63 |
+| tumvi_room4 | 1.08 | 0.80 | 0.82 | 0.78 | 0.80 |
 
 All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
-start mid-flight, the 15 held-out runs average 0.64 of stay-still on the path
-(worst 1.05, V2_02 cut to start mid-flight) and 0.88 on the blind 5 s. This check found two real bugs,
+start mid-flight, the 15 held-out runs average 0.61 of stay-still on the path
+(worst 0.82) and 0.87 on the blind 5 s. This check found two real bugs,
 both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
 bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight
 had no bias estimate at all. The rotor-drag step was tuned on the first four

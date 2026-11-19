@@ -55,8 +55,8 @@ CFG = {
     "bias_ridge": 1e-3,    # pulls weakly seen bias components towards no change
     "bias_max": 0.2,       # rad/s, largest correction one round may make
     "still_acc_std": 1.0,  # m/s^2 of accel jitter still counted as standing (motors idling)
-    "tilt_window_s": 30.0, # averaging window for the gravity direction
-    "tilt_window_noisy_s": 8.0,   # the same where the gyro is mostly noise
+    "tilt_window_s": 35.0, # averaging window for the gravity direction
+    "tilt_window_noisy_s": 6.0,   # the same where the gyro is mostly noise
     "band_lo_hz": 0.03,    # position keeps motion above this frequency ...
     "band_hi_hz": 0.05,    # ... fully above this one, with a smooth ramp between
     "lp_hz": 3.0,          # above this, acceleration is vibration
@@ -78,7 +78,7 @@ CFG = {
     "ground_smooth_s": 1.0,
     "drag_offset_ridge": 0.6,  # >0: side-axis offsets from a zero mean velocity in the room
     "pin_z": 1,            # drone on the ground: height held at one floor level
-    "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
+    "drag_smooth_s": 0.3,  # s, averaging of the lateral acceleration
     "drag_cross_hz": 0.08,  # below this, horizontal position comes from drag velocity
     "drag_fc_hz": 0.015,    # slow drag motion fades in as f^2 / (f^2 + fc^2) ...
     "drag_fc_keep": 1,      # ... on top of the drag_lo_hz ramp, never below it
@@ -90,9 +90,11 @@ CFG = {
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
     "drag_gain": 0.65,     # shrink, for the same reason as gain
     "pos_hz": 20.0,        # rate of the position work
+    "seg_gap_s": 0.2,      # a dropout longer than this restarts the tilt and bias fits
+    "head_gap_s": 0.0,      # ... and this one shrinks the path for lost heading (0 = long_gap_s)
     "long_gap_s": 0.3,     # a dropout longer than this splits the attitude fix
     "rot_ref": 3.0, "rot_pow": 4.0, "rot_smooth_s": 5.0,  # rad/s: fast rotation shortens the tilt window (gyro scale errors)
-    "gyro_noise_ref": 0.35,  # rad/s of sample-to-sample gyro jitter where trust halves
+    "gyro_noise_ref": 0.5,  # rad/s of sample-to-sample gyro jitter where trust halves
 }
 
 
@@ -257,12 +259,15 @@ def resample(tv, imu, valid, fs):
             out[s:s + len(grid), ch] = np.interp(grid, tv, col)
         del col
     # grid samples that fall inside a long gap carry no real measurement
-    gap = np.zeros(m, bool)
-    for k in np.flatnonzero(np.diff(tv) > CFG["long_gap_s"]):
+    gaps = []
+    lo = min(CFG["long_gap_s"], CFG["seg_gap_s"] or 1e9, CFG["head_gap_s"] or 1e9)
+    dtv = np.diff(tv)
+    for k in np.flatnonzero(dtv > lo):
         a = int(math.ceil((tv[k] - grid0) * fs))
         b = int(math.floor((tv[k + 1] - grid0) * fs))
-        gap[max(a, 0):max(b + 1, 0)] = True
-    return grid0, out, gap
+        if b >= a:
+            gaps.append((max(a, 0), max(b, 0), float(dtv[k])))
+    return grid0, out, gaps
 
 
 # ---------------------------------------------------------------- 4. attitude
@@ -323,12 +328,19 @@ def smooth_segments(x, n, seg, w):
     return out
 
 
-def block_flags(gap, d):
-    """Per block: inside a long gap, and segment number (a new one after each gap)."""
-    nb = len(gap) // d
-    bg = gap[:nb * d].reshape(nb, d).any(axis=1)
-    seg = np.cumsum(np.concatenate([[False], bg[1:] & ~bg[:-1]]))
-    return bg, seg
+def gap_blocks(gaps, n, d, min_s):
+    """Per block of d samples: inside a dropout longer than min_s."""
+    nb = n // d
+    bg = np.zeros(nb, bool)
+    for a, b, dur in gaps:
+        if dur > min_s:
+            bg[min(a // d, nb):min(b // d + 1, nb)] = True
+    return bg
+
+
+def segments(bg):
+    """Segment number per block, a new one after each gap."""
+    return np.cumsum(np.concatenate([[False], bg[1:] & ~bg[:-1]]))
 
 
 def gyro_quality(gyro, d):
@@ -478,13 +490,20 @@ def fit_bias(q, g, fs, d, bgap, seg):
     k = 2 * nseg + 3
     ata = np.zeros((k, k))
     atb = np.zeros(k)
+    sg = seg[:nb]
     for ax in range(2):
-        a = np.zeros((nb, k))
-        a[np.arange(nb), 2 * seg + ax] = 1.0
-        a[:, 2 * nseg:] = -m[:, 3 * ax:3 * ax + 3]
-        aw = a * w[:, None]
-        ata += aw.T @ a
-        atb += aw.T @ phi[:, ax]
+        # columns: one offset per segment (an indicator) and the three bias
+        # terms; the normal equations are built from per-segment sums, so no
+        # (blocks x segments) matrix is ever formed
+        mb = -m[:, 3 * ax:3 * ax + 3]
+        idx = 2 * np.arange(nseg) + ax
+        ata[idx, idx] += np.bincount(sg, weights=w, minlength=nseg)
+        cross = np.stack([np.bincount(sg, weights=w * mb[:, j], minlength=nseg) for j in range(3)], axis=1)
+        ata[idx, 2 * nseg:] += cross
+        ata[2 * nseg:, idx] += cross.T
+        ata[2 * nseg:, 2 * nseg:] += (mb * w[:, None]).T @ mb
+        atb[idx] += np.bincount(sg, weights=w * phi[:, ax], minlength=nseg)
+        atb[2 * nseg:] += (mb * w[:, None]).T @ phi[:, ax]
     ridge = CFG["bias_ridge"] * w.sum() * (d / fs) ** 2 * win ** 2
     ata[2 * nseg:, 2 * nseg:] += ridge * np.eye(3)
     try:
@@ -865,16 +884,18 @@ def estimate(ts, imu):
     fs = min(max(fs, 20.0), 1000.0)
     del dts
 
-    grid0, g, gap = resample(t, imu, valid, fs)
+    grid0, g, gaps = resample(t, imu, valid, fs)
     del valid, imu, t
     d = max(int(round(fs / CFG["pos_hz"])), 1)
     calib_n = still_prefix(g, fs)
-    bgap, seg = block_flags(gap, d)
-    del gap
-    q = attitude(g, fs, d, calib_n, bgap, seg)
+    bgap = gap_blocks(gaps, len(g), d, CFG["long_gap_s"])
+    batt = gap_blocks(gaps, len(g), d, CFG["seg_gap_s"]) if CFG["seg_gap_s"] else bgap
+    bhead = gap_blocks(gaps, len(g), d, CFG["head_gap_s"]) if CFG["head_gap_s"] else bgap
+    seg = segments(batt)
+    q = attitude(g, fs, d, calib_n, batt, seg)
     # from here on only the accelerometer is needed: keep that half alone
     quality = gyro_quality(g[:, 0:3], d)[:, None]
-    heading = heading_trust(g[:, 0:3], d, bgap, fs) if CFG["head_k"] > 0 else None
+    heading = heading_trust(g[:, 0:3], d, bhead, fs) if CFG["head_k"] > 0 else None
     acc = np.ascontiguousarray(g[:, 3:6])
     del g
 

@@ -84,6 +84,7 @@ CFG = {
     "drag_fc_scale": 0.7,   # ... scaled by this
     "home_fc_hz": 0.0,      # the blind target keeps the plain ramp
     "gap_not_ground": 1, "drag_bridge": 1,  # dropouts are not ground; drag velocity bridged across them
+    "head_k": 0.3,          # after long gaps the heading is unknown: shrink the horizontal path (0 = off)
     "home_floor_z": 1,       # drone: blind target height = floor level (they land where they took off)
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
     "drag_gain": 0.65,     # shrink, for the same reason as gain
@@ -344,6 +345,36 @@ def gyro_quality(gyro, d):
         hf[s // d:e // d] = np.sqrt((dg * dg).sum(axis=1).reshape(-1, d).mean(axis=1))
     hf = smooth(hf[:, None], max(int(5.0 * CFG["pos_hz"]), 1))[:, 0]
     return 1.0 / (1.0 + (hf / CFG["gyro_noise_ref"]) ** 4)
+
+
+def heading_trust(gyro, d, bgap, fs):
+    """Per block, how much of the horizontal path's direction survives the long
+    dropouts before it: E[cos(heading error)] = exp(-sigma^2 / 2), with sigma
+    growing with each gap's length times the file's typical turn rate. The
+    turn made inside a gap cannot be measured, so after long gaps the path is
+    shrunk towards its centre instead of continuing in a wrong direction."""
+    nb = len(gyro) // d
+    if nb < 2 or not bgap[:nb].any():
+        return None
+    # typical turn rate: rms of the 0.5 s averaged gyro about its median, measured blocks only
+    gb = gyro[:nb * d].reshape(nb, d, 3).mean(axis=1)
+    ok = ~bgap[:nb]
+    gb = smooth(gb, max(int(0.5 * fs / d), 1))[ok]
+    rate = float(np.sqrt(((gb - np.median(gb, axis=0)) ** 2).sum(axis=1).mean()))
+    var = np.zeros(nb)
+    i = 0
+    g = bgap[:nb]
+    while i < nb:
+        if g[i]:
+            j = i
+            while j < nb and g[j]:
+                j += 1
+            L = (j - i) * d / fs
+            var[j:] += (CFG["head_k"] * rate * L) ** 2
+            i = j
+        else:
+            i += 1
+    return np.exp(-0.5 * var)
 
 
 def integrate_gyro(gyro, q0, fs, bias):
@@ -790,6 +821,7 @@ def estimate(ts, imu):
     q = attitude(g, fs, d, calib_n, bgap, seg)
     # from here on only the accelerometer is needed: keep that half alone
     quality = gyro_quality(g[:, 0:3], d)[:, None]
+    heading = heading_trust(g[:, 0:3], d, bgap, fs) if CFG["head_k"] > 0 else None
     acc = np.ascontiguousarray(g[:, 3:6])
     del g
 
@@ -814,6 +846,8 @@ def estimate(ts, imu):
         else:
             home = (p[:n0] * quality[:n0]).mean(axis=0)
         p *= quality
+        if heading is not None:
+            p[:, :2] *= heading[:len(p), None]
         if drag is not None and CFG["pin_z"]:
             p = pin_ground(p, drag[1][:len(p)], CFG["pos_hz"])
             gr = drag[1][:len(p)]

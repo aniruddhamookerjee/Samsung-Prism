@@ -66,6 +66,12 @@ about 0.15 m of its take-off height.
 A dropout longer than 0.3 s is never taken for the ground (its interpolated
 samples carry no motor buzz), and the drag velocity is bridged across it: on the
 2 s gap set the dropout error falls from 4.78 to 4.35 m on MH_04.
+Inside a long dropout the device keeps turning (50 to 150 degrees over 5 s on
+these recordings) and that turn cannot be measured, so after each long gap the
+horizontal path is scaled by the expected cosine of the heading error, which
+grows with the gap's length times the file's typical turn rate. On the 2 s and
+5 s gap sets this takes the path from 0.84 to 0.79 of stay-still (worst run
+1.23 to 1.01) and the dropout error from 0.95 to 0.86.
 
 ### Results (sarthak-v7, metres)
 

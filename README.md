@@ -66,17 +66,42 @@ about 0.15 m of its take-off height.
 
 ### Results (sarthak-v7, metres)
 
-| recording | stay-still ate | ours ate | stay-still blind | ours blind |
-| --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.18 | 1.04 | 0.51 |
-| V1_03_difficult | 1.58 | 1.07 | 1.27 | 0.63 |
-| MH_04_difficult | 6.81 | 4.07 | 3.85 | 0.85 |
-| tumvi_room1 | 1.00 | 0.32 | 0.63 | 0.60 |
+Organisers' damage, default column order:
 
-Across the default, raw-order and four harsher stress sets (24 runs), the path
-error is 0.62 of stay-still on average (v3, before rotor drag: 0.77) and below it
-in every run; the blind error is 0.58 of stay-still (v3: 0.98). Peak memory is 2.8 to 4.4 MB
-(tracemalloc, after `import numpy`), runtime 1.4 to 2.9 ms per second of data.
+| recording | stay-still ate | ours ate | ours / stay-still | stay-still blind | ours blind | stay-still gaps | ours gaps | rotation (deg) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| V1_02_medium | 1.78 | 1.18 | 0.66 | 1.04 | 0.51 | 1.61 | 1.14 | 3.2 |
+| V1_03_difficult | 1.58 | 1.07 | 0.68 | 1.27 | 0.62 | 1.09 | 0.91 | 7.3 |
+| MH_04_difficult | 6.81 | 4.06 | 0.60 | 3.85 | 0.85 | 7.87 | 3.76 | 16.2 |
+| tumvi_room1 | 1.00 | 0.32 | 0.32 | 0.63 | 0.60 | 0.87 | 0.33 | 9.7 |
+
+Every damage type, as a fraction of stay-still (mean of the 4 recordings, worst in brackets):
+
+| damage | path | blind 5 s | around gaps |
+| --- | --- | --- | --- |
+| organisers' | 0.56 (0.68) | 0.54 (0.96) | 0.60 (0.84) |
+| organisers', raw column order | 0.59 (0.72) | 0.62 (0.97) | 0.63 (0.89) |
+| damage from the start | 0.63 (0.69) | 0.57 (1.14) | 0.68 (0.80) |
+| twice the damage | 0.61 (0.71) | 0.50 (1.01) | 0.70 (0.96) |
+| twice, raw column order | 0.65 (0.72) | 0.63 (1.06) | 0.74 (0.90) |
+| gaps of 2 to 3.5 s | 0.70 (0.74) | 0.61 (1.06) | 0.88 (1.20) |
+
+Over the 24 runs the path error is 0.62 of stay-still (v3, before rotor drag:
+0.77) and below it in every run; the blind error is 0.58 of stay-still (v3:
+0.98). Five runs are slightly worse than stay-still on one window: the blind 5 s
+on tumvi_room1 under the four harsher sets (at most 0.09 m worse; the handheld
+recording has no rotor drag to read velocity from), and the gaps on
+V1_03_difficult with 2 to 3.5 s gaps (1.18 m against 0.98 m).
+
+Peak memory is 3.3 to 5.3 MB (tracemalloc, after `import numpy`), runtime 2.3
+to 3.3 ms per second of data on one laptop, 1.4 to 2.9 ms on another.
+
+![error against stay-still](docs/figures/results_errors.png)
+![every damage type](docs/figures/results_stress.png)
+![runtime and memory](docs/figures/results_budget.png)
+
+`python tools/plot_results.py` redraws these three from `results/results.csv`
+(`--label` picks the version).
 `python tools/evalall.py` prints these ratios for every local set at once,
 `python tools/plot_path.py data/degraded/tumvi_room1` draws the estimate
 against the ground truth.

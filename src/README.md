@@ -34,11 +34,11 @@ python src/main.py <input_path> [output_path]
 | :--- | :--- | :--- | :--- |
 | **Language** | Python only (`main.py`) | Pure Python + NumPy | **PASS (100%)** |
 | **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.06 MB** (algorithm buffers) | **PASS (< 40% of budget)** |
-| **Execution Speed** | `< 20.0 ms / 1 s data` | **2.07 ms / 1 s data** | **PASS (9x faster than limit)** |
+| **Execution Speed** | `< 20.0 ms / 1 s data` | **2.17 ms / 1 s data** | **PASS (9x faster than limit)** |
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
-| **Alignment Score (ATE)**| Baseline: 1.00 m | **0.352 m** (0.35x baseline error) | **EXCEEDS BASELINE** |
-| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.649 m** | **STABLE** |
+| **Alignment Score (ATE)**| Baseline: 1.00 m | **0.318 m** (0.32x baseline error) | **EXCEEDS BASELINE** |
+| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.600 m** | **BEATS BASELINE** |
 
 ---
 
@@ -91,7 +91,7 @@ The estimator processes telemetry offline in seven sequential stages:
 5. **`position`**:
    - Downsamples world acceleration to $20\text{ Hz}$ to drastically cut FFT memory and compute overhead.
    - Performs frequency-domain double integration within a tuned pass band ($0.02\text{ Hz} \dots 3.0\text{ Hz}$).
-   - Employs asymmetric gain scaling ($0.25$ horizontal, $0.90$ vertical) to penalize false horizontal acceleration induced by residual tilt errors.
+   - Employs asymmetric gain scaling ($0.15$ horizontal below $0.065\text{ Hz}$, $1.0$ above) to penalize false horizontal acceleration induced by residual tilt errors.
    - Attenuates position variance when high-frequency gyro noise indicates heavy sensor jamming.
    - **Rotor-drag velocity (multirotors)**: when the accelerometer carries motor vibration, the two directions perpendicular to the measured thrust direction (the EuRoC IMU is mounted about 20 deg off it) measure only rotor drag, $a = -k\,v$ with $k \approx 0.2\text{ s}^{-1}$ (fitted 0.18 to 0.22 on every EuRoC flight against ground truth). Below $0.08\text{ Hz}$, horizontal position comes from integrating this directly measured velocity once instead of acceleration twice. Where the motor vibration drops below 0.6 of its typical level the drone is on the ground, and the velocity is set to zero. Handheld recordings have no motor vibration and skip this step.
 6. **`blind` 5-Second Prediction**:

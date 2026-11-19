@@ -77,18 +77,19 @@
   - Evaluated on benchmark `tumvi_room1`: 27,330 rows, exactly matching input count and timestamps.
   - Quaternion normalization verified: $\|q\| = 1.0 \pm 10^{-7}$; 0 NaNs, 0 Infs.
 - **Scored Results vs Stay-Still Baseline**:
-  - **Absolute Trajectory Error (ATE)**: **0.352 m** vs 1.000 m baseline (**65% error reduction!**)
-  - **Dropout Gap Window ATE**: **0.385 m** vs 0.870 m baseline (**56% error reduction!**)
-  - **Relative Pose Error (RPE 1s)**: **0.202 m**
-  - **Rotation Error**: **9.721°** across the entire 141-second trajectory.
+  - **Absolute Trajectory Error (ATE)**: **0.318 m** vs 1.000 m baseline (**68% error reduction!**)
+  - **Dropout Gap Window ATE**: **0.330 m** vs 0.869 m baseline (**62% error reduction!**)
+  - **Relative Pose Error (RPE 1s)**: **0.193 m**
+  - **Rotation Error**: **9.733°** across the entire 141-second trajectory.
   - **Peak Memory**: **3.06 MB** (Budget: 8.0 MB — utilizing only 38% of allowed memory).
-  - **Processing Speed**: **2.07 ms/s** (Budget: 20.0 ms/s — **9.7x faster than required limit**).
-- **Across all drone and handheld runs**: path error 0.65x and blind 5 s error 0.58x of stay-still over 24 tuning runs; 0.69x path over 15 held-out runs and 0.72x over 10 runs on five recordings never used for tuning.
+  - **Processing Speed**: **2.17 ms/s** (Budget: 20.0 ms/s — **9.2x faster than required limit**).
+- **Across all drone and handheld runs**: path error 0.63x and blind 5 s error 0.57x of stay-still over 24 tuning runs; 0.68x path over 15 held-out runs and 0.66x over 10 runs on five recordings never used for tuning.
+- **Figure for this slide**: `docs/figures/drag.png` (accelerometer-derived velocity vs motion-capture velocity) and `docs/figures/MH_04_difficult.png` (path vs ground truth).
 
 ---
 
 ### Slide 6: Key Differentiators & Technical Innovations
-1. **Rotor Drag as a Velocity Sensor (our key idea)**: A multirotor's thrust is along one body axis, so the other two accelerometer axes see only rotor drag, $a = -k\,v$. Against ground truth every EuRoC flight fits the same $k = 0.18 \dots 0.22\text{ s}^{-1}$ (correlation up to 0.98). Velocity integrated once drifts far less than acceleration integrated twice: Drag is read perpendicular to the measured thrust direction (the EuRoC IMU is mounted 20 deg off it), and the velocity is zero where motor vibration drops to idle (drone on the pad). MH_04 path error 6.50 m to 4.30 m, blind 5 s error 3.67 m to 0.91 m. Detected automatically from motor vibration, so handheld data is untouched.
+1. **Rotor Drag as a Velocity Sensor (our key idea)**: A multirotor's thrust is along one body axis, so the other two accelerometer axes see only rotor drag, $a = -k\,v$. Against ground truth every EuRoC flight fits the same $k = 0.18 \dots 0.22\text{ s}^{-1}$ (correlation up to 0.98). Velocity integrated once drifts far less than acceleration integrated twice. Drag is read perpendicular to the measured thrust direction (the EuRoC IMU is mounted 20 deg off it), and the velocity is zero where motor vibration drops to idle (drone on the pad). MH_04 path error 6.50 m to 4.32 m, blind 5 s error 3.67 m to 0.89 m. Detected automatically from motor vibration, so handheld data is untouched.
 2. **Frequency-Domain Double Integration**: Traditional time-domain Riemann integration ($\iint a\,dt^2$) quadratically explodes with any minute tilt bias ($1^\circ \text{ tilt} \to 0.17\text{ m/s}^2 \to 150\text{ m}$ drift in 30s). Our spectral integration filters out the DC drift band while preserving dynamic maneuvers.
 3. **Asymmetric Gain Optimization**: Recognizes that horizontal acceleration is highly sensitive to tilt errors, whereas vertical acceleration is bounded by gravity. Applies horizontal gain ($0.25$) and vertical gain ($0.90$), preventing false lateral wander.
 4. **Adaptive Gyro Jamming Trust Weighting**: Dynamically computes sample-to-sample jitter $\Delta\omega$; as jamming intensifies, position confidence automatically fades toward safe bounds.

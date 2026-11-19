@@ -78,7 +78,11 @@ CFG = {
     "drag_offset_ridge": 0.6,  # >0: side-axis offsets from a zero mean velocity in the room
     "pin_z": 1,            # drone on the ground: height held at one floor level
     "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
-    "drag_cross_hz": 0.08, # below this, horizontal position comes from drag velocity
+    "drag_cross_hz": 0.08,  # below this, horizontal position comes from drag velocity
+    "drag_fc_hz": 0.015,    # slow drag motion fades in as f^2 / (f^2 + fc^2) ...
+    "drag_fc_keep": 1,      # ... on top of the drag_lo_hz ramp, never below it
+    "drag_fc_scale": 0.7,   # ... scaled by this
+    "home_fc_hz": 0.0,      # the blind target keeps the plain ramp
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
     "drag_gain": 0.65,     # shrink, for the same reason as gain
     "pos_hz": 20.0,        # rate of the position work
@@ -639,8 +643,16 @@ def band_integrate(a, fs, vel=None):
         cross = 1.0 - ramp(CFG["drag_cross_hz"] / 1.5, CFG["drag_cross_hz"] * 1.5)
         a_gain = base * (1.0 - cross) * CFG["gain_hi"]
         v_gain = np.zeros(len(f), complex)
-        v_gain[nz] = cross[nz] * ramp(CFG["drag_lo_hz"], 2 * CFG["drag_lo_hz"])[nz] * CFG["drag_gain"] / (
-            2j * math.pi * f[nz])
+        if CFG["drag_fc_hz"] > 0:
+            # drag velocity carries a slowly wandering offset, which one
+            # integration turns into drift; a second-order high pass fades it
+            # out smoothly instead of cutting the slow motion off
+            hp = f ** 2 / (f ** 2 + CFG["drag_fc_hz"] ** 2)
+            if CFG["drag_fc_keep"]:
+                hp = np.maximum(hp * CFG["drag_fc_scale"], ramp(CFG["drag_lo_hz"], 2 * CFG["drag_lo_hz"]))
+        else:
+            hp = ramp(CFG["drag_lo_hz"], 2 * CFG["drag_lo_hz"])
+        v_gain[nz] = cross[nz] * hp[nz] * CFG["drag_gain"] / (2j * math.pi * f[nz])
         vel = vel - vel.mean(axis=0)
 
     p = np.empty((n, 3))
@@ -762,11 +774,12 @@ def estimate(ts, imu):
         if drag is not None and CFG["home_raw_drag"]:
             # the blind target is read from a track that keeps drag on the pad
             # too; on the practice flights it lands nearer the true start
-            keep = CFG["ground_buzz"]
+            keep = CFG["ground_buzz"], CFG["drag_fc_hz"]
             CFG["ground_buzz"] = 0.0
             raw = drag_velocity(q, g[:, 3:6], d, fs / d, bgap)
-            CFG["ground_buzz"] = keep
+            CFG["drag_fc_hz"] = CFG["home_fc_hz"]
             home = (band_integrate(acc_w, fs / d, raw[0])[:n0] * quality[:n0]).mean(axis=0)
+            CFG["ground_buzz"], CFG["drag_fc_hz"] = keep
         else:
             home = (p[:n0] * quality[:n0]).mean(axis=0)
         p *= quality

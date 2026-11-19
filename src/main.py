@@ -45,6 +45,7 @@ OUT_CHUNK = 1024
 
 # tuned on the practice recordings, see README
 CFG = {
+    "spike_k": 8.0, "spike_floor_g": 0.05, "spike_floor_a": 0.5,
     "calib_s": 2.0,        # longest start window used for gyro bias and initial tilt,
                            # cut short as soon as the device moves
     "bias_select": 1, "bias_select_margin": 0.8,  # no still start: also fit from the median gyro, keep it if tilt drift drops 20%
@@ -68,7 +69,7 @@ CFG = {
     "z_band_lo_hz": 0.02,  # vertical pass band starts here
     "coast_tau_s": 0.3,    # blind segment: velocity decays with this time constant
     "return_tau_s": 1.0,   # blind segment: move to the target with this time constant
-    "blind_home": 1.0,     # blind target: 0 = path centre, 1 = estimated start point
+    "blind_home": 0.9,     # blind target: 0 = path centre, 1 = estimated start point
     "home_raw_drag": 1,    # blind target from the track without ground detection
     "home_s": 12.0,        # the start point is the mean over this many seconds
     "drag": 1,             # use rotor drag for horizontal velocity when the file looks like a multirotor
@@ -76,7 +77,7 @@ CFG = {
     "drag_k": 0.2,         # 1/s, rotor drag constant (EuRoC fits 0.18 to 0.22)
     "ground_buzz": 0.6,    # blocks with less than this fraction of the typical motor buzz are on the ground
     "ground_smooth_s": 1.0,
-    "drag_offset_ridge": 0.6,  # >0: side-axis offsets from a zero mean velocity in the room
+    "drag_offset_ridge": 0.3,  # >0: side-axis offsets from a zero mean velocity in the room
     "pin_z": 1,            # drone on the ground: height held at one floor level
     "drag_smooth_s": 0.3,  # s, averaging of the lateral acceleration
     "drag_cross_hz": 0.08,  # below this, horizontal position comes from drag velocity
@@ -238,8 +239,8 @@ def clean(ts, imu):
                 del a, c, med, x
                 cs = np.cumsum(np.pad(res, (w // 2 + 1, w // 2), mode="edge"))
                 local = (cs[w:] - cs[:-w]) / w
-                floor = 0.05 if ch < 3 else 0.5
-                spike[s:e] |= (res > 8.0 * local + floor)[s - lo:e - lo]
+                floor = CFG["spike_floor_g"] if ch < 3 else CFG["spike_floor_a"]
+                spike[s:e] |= (res > CFG["spike_k"] * local + floor)[s - lo:e - lo]
                 del cs, local, res
         valid[idx[spike]] = False
     return valid, dead_from

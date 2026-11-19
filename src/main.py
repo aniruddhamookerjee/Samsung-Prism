@@ -209,32 +209,40 @@ def clean(ts, imu):
     # measured against the local noise level
     idx = np.flatnonzero(valid)
     if len(idx) > 20:
-        spike = np.zeros(len(idx), bool)
+        n_idx = len(idx)
+        spike = np.zeros(n_idx, bool)
         w = 101
-        for ch in range(6):
-            x = imu[idx, ch].astype(np.float64)
-            a = np.empty_like(x)
-            c = np.empty_like(x)
-            a[1:] = x[:-1]
-            a[0] = x[1]
-            c[:-1] = x[1:]
-            c[-1] = x[-2]
-            med = np.maximum(np.minimum(a, x), np.minimum(np.maximum(a, x), c))
-            res = np.abs(x - med)
-            del a, c, med, x
-            cs = np.cumsum(np.pad(res, (w // 2 + 1, w // 2), mode="edge"))
-            local = (cs[w:] - cs[:-w]) / w
-            floor = 0.05 if ch < 3 else 0.5
-            spike |= res > 8.0 * local + floor
-            del cs, local, res
+        # in chunks with a halo wider than the window, so the temporaries stay
+        # small on long files; inside a chunk every value is the same as for
+        # the whole file at once
+        for s in range(0, n_idx, 4 * CHUNK):
+            e = min(s + 4 * CHUNK, n_idx)
+            lo, hi = max(s - w, 0), min(e + w, n_idx)
+            sub = idx[lo:hi]
+            for ch in range(6):
+                x = imu[sub, ch].astype(np.float64)
+                a = np.empty_like(x)
+                c = np.empty_like(x)
+                a[1:] = x[:-1]
+                a[0] = x[1]
+                c[:-1] = x[1:]
+                c[-1] = x[-2]
+                med = np.maximum(np.minimum(a, x), np.minimum(np.maximum(a, x), c))
+                res = np.abs(x - med)
+                del a, c, med, x
+                cs = np.cumsum(np.pad(res, (w // 2 + 1, w // 2), mode="edge"))
+                local = (cs[w:] - cs[:-w]) / w
+                floor = 0.05 if ch < 3 else 0.5
+                spike[s:e] |= (res > 8.0 * local + floor)[s - lo:e - lo]
+                del cs, local, res
         valid[idx[spike]] = False
     return valid, dead_from
 
 
 # ---------------------------------------------------------------- 3. resample
 
-def resample(t, imu, valid, fs):
-    tv = t[valid]
+def resample(tv, imu, valid, fs):
+    """tv: times in seconds of the valid rows only."""
     m = int(math.floor((tv[-1] - tv[0]) * fs + 1e-9)) + 1
     grid0 = float(tv[0])
     out = np.empty((m, 6), np.float32)
@@ -751,14 +759,15 @@ def estimate(ts, imu):
         return None
     imu = gyro_first(imu)
     valid, dead_from = clean(ts, imu)
-    t = (ts - ts[0]) * 1e-9
-    if valid.sum() < 10 or t[-1] <= 0:
+    if valid.sum() < 10 or ts[-1] <= ts[0]:
         return None
+    t = (ts[valid] - ts[0]) * 1e-9     # seconds, valid rows only
 
-    dts = np.diff(t[valid])
+    dts = np.diff(t)
     dts = dts[dts > 0]
     fs = 1.0 / median(dts) if len(dts) else 200.0
     fs = min(max(fs, 20.0), 1000.0)
+    del dts
 
     grid0, g, gap = resample(t, imu, valid, fs)
     del valid, imu, t
@@ -767,23 +776,26 @@ def estimate(ts, imu):
     bgap, seg = block_flags(gap, d)
     del gap
     q = attitude(g, fs, d, calib_n, bgap, seg)
+    # from here on only the accelerometer is needed: keep that half alone
+    quality = gyro_quality(g[:, 0:3], d)[:, None]
+    acc = np.ascontiguousarray(g[:, 3:6])
+    del g
 
     if len(q) >= 2 * d:
-        acc_w = block_world_acc(q, g[:, 3:6], d)
+        acc_w = block_world_acc(q, acc, d)
         cb = max(max(calib_n, int(0.25 * fs)) // d, 1)
         g_mag = float(np.linalg.norm(acc_w[:cb].mean(axis=0)))
         acc_w[:, 2] -= g_mag
         acc_w[bgap] = 0.0          # nothing was measured there
-        drag = drag_velocity(q, g[:, 3:6], d, fs / d, bgap) if CFG["drag"] else None
+        drag = drag_velocity(q, acc, d, fs / d, bgap) if CFG["drag"] else None
         p = band_integrate(acc_w, fs / d, None if drag is None else drag[0])
-        quality = gyro_quality(g[:, 0:3], d)[:, None]
         n0 = max(1, min(len(p), int(CFG["home_s"] * CFG["pos_hz"])))
         if drag is not None and CFG["home_raw_drag"]:
             # the blind target is read from a track that keeps drag on the pad
             # too; on the practice flights it lands nearer the true start
             keep = CFG["ground_buzz"], CFG["drag_fc_hz"]
             CFG["ground_buzz"] = 0.0
-            raw = drag_velocity(q, g[:, 3:6], d, fs / d, bgap)
+            raw = drag_velocity(q, acc, d, fs / d, bgap)
             CFG["drag_fc_hz"] = CFG["home_fc_hz"]
             home = (band_integrate(acc_w, fs / d, raw[0])[:n0] * quality[:n0]).mean(axis=0)
             CFG["ground_buzz"], CFG["drag_fc_hz"] = keep
@@ -801,7 +813,7 @@ def estimate(ts, imu):
         p = np.zeros((1, 3))
         pt = np.array([grid0])
         home = np.zeros(3)
-    del g
+    del acc
     return {"grid0": grid0, "fs": fs, "q": q, "pt": pt, "p": p, "home": home}
 
 

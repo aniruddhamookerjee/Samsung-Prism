@@ -77,13 +77,13 @@
   - Evaluated on benchmark `tumvi_room1`: 27,330 rows, exactly matching input count and timestamps.
   - Quaternion normalization verified: $\|q\| = 1.0 \pm 10^{-7}$; 0 NaNs, 0 Infs.
 - **Scored Results vs Stay-Still Baseline**:
-  - **Absolute Trajectory Error (ATE)**: **0.318 m** vs 1.000 m baseline (**68% error reduction!**)
-  - **Dropout Gap Window ATE**: **0.331 m** vs 0.869 m baseline (**62% error reduction!**)
-  - **Relative Pose Error (RPE 1s)**: **0.194 m**
-  - **Rotation Error**: **9.732°** across the entire 141-second trajectory.
+  - **Absolute Trajectory Error (ATE)**: **0.320 m** vs 1.000 m baseline (**68% error reduction!**)
+  - **Dropout Gap Window ATE**: **0.338 m** vs 0.869 m baseline (**61% error reduction!**)
+  - **Relative Pose Error (RPE 1s)**: **0.192 m**
+  - **Rotation Error**: **9.725°** across the entire 141-second trajectory.
   - **Peak Memory**: **3.06 MB** (Budget: 8.0 MB — utilizing only 38% of allowed memory).
   - **Processing Speed**: **2.17 ms/s** (Budget: 20.0 ms/s — **9.2x faster than required limit**).
-- **Across all drone and handheld runs**: path error 0.62x and blind 5 s error 0.58x of stay-still over 24 tuning runs; 0.65x path over 15 held-out runs and 0.64x over 10 runs on five recordings never used for tuning.
+- **Across all drone and handheld runs**: path error 0.62x and blind 5 s error 0.58x of stay-still over 24 tuning runs; 0.64x path over 15 held-out runs and 0.64x over 10 runs on five recordings never used for tuning.
 - **Figure for this slide**: `docs/figures/drag.png` (accelerometer-derived velocity vs motion-capture velocity) and `docs/figures/MH_04_difficult.png` (path vs ground truth).
 
 ---

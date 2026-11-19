@@ -234,7 +234,7 @@ def create_deck(output_path=ROOT / "presentation" / "SRMIST_KTR_SAM.pptx"):
              f"{acc['blind_5s_rmse_meters']:.2f}"]]
     table(s, Inches(0.6), Inches(1.6), Inches(7.6), rows, [2.8, 1.15, 1.0, 1.4, 1.25], size=13, highlight_col=2)
     bullets(s, Inches(0.6), Inches(3.9), Inches(7.6), Inches(3), [
-        ("49 runs, 3 groups (path / blind, x stay-still):", "tuning 0.62 / 0.58; held-out 0.65 / 0.88; five recordings never used for tuning 0.64 / 0.73."),
+        ("49 runs, 3 groups (path / blind, x stay-still):", "tuning 0.62 / 0.58; held-out 0.64 / 0.88; five recordings never used for tuning 0.64 / 0.73."),
         ("Submitted file (tumvi_room1):", f"dropout windows {acc['dropout_gap_rmse_meters']:.2f} m (stay-still 0.87), "
                                           f"1 s drift {acc['rpe_1s_meters']:.2f} m, rotation {acc['rotation_rmse_degrees']:.1f} deg."),
         ("Resources:", f"peak memory {perf['peak_memory_mb']:.1f} MB of 8 (algorithm level, as the FAQ measures), {perf['runtime_ms_per_second']:.1f} ms per second of data of 20."),

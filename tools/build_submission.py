@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
-"""Builds and validates team_name.zip bundle for Samsung PRISM Hackathon Track 3 submission."""
+"""Builds and checks bundle/PrismPathFinders.zip for the Track 3 submission.
 
-import json
+    python tools/build_submission.py
+
+Every file is taken from the last commit (git show HEAD:<path>), not from the
+working folder: on Windows with core.autocrlf the working copies have CRLF
+line endings, the committed ones LF. So commit first, then build, then commit
+the zip. Without git it falls back to the working folder.
+"""
+
+import subprocess
 import zipfile
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+ZIP = "bundle/PrismPathFinders.zip"
 REQUIRED_FILES = [
     "src/main.py",
     "src/README.md",
@@ -12,39 +22,43 @@ REQUIRED_FILES = [
     "metadata.json",
     "requirements.txt",
     "Dockerfile",
-    "presentation/CollegeName_TeamName_Presentation.md",
-    "presentation/CollegeName_TeamName.pptx",
+    "presentation/SRMIST_KTR_PrismPathFinders_Presentation.md",
+    "presentation/SRMIST_KTR_PrismPathFinders.pptx",
 ]
 
-def build_bundle(zip_path="bundle/team_name.zip"):
-    root = Path(__file__).resolve().parent.parent
-    zip_out = root / zip_path
-    zip_out.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Validating required submission assets in {root}...")
-    for rel_path in REQUIRED_FILES:
-        target = root / rel_path
-        if not target.exists():
-            raise FileNotFoundError(f"Missing required submission file: {rel_path}")
-        print(f"  [OK] Found {rel_path} ({target.stat().st_size} bytes)")
+def committed(rel_path):
+    try:
+        r = subprocess.run(["git", "-C", str(ROOT), "show", "HEAD:" + rel_path], capture_output=True, check=True)
+        return r.stdout
+    except (OSError, subprocess.CalledProcessError):
+        p = ROOT / rel_path
+        if not p.exists():
+            raise FileNotFoundError(f"missing required submission file: {rel_path}")
+        return p.read_bytes()
 
-    # Verify estimated_trajectory.txt formatting
-    est_path = root / "estimated_trajectory.txt"
-    with open(est_path, "r") as f:
-        first_line = f.readline()
-        second_line = f.readline().split()
-        if len(second_line) != 8:
-            raise ValueError(f"estimated_trajectory.txt row has {len(second_line)} columns, expected 8")
-    print("  [OK] Validated estimated_trajectory.txt structure (8 space-separated columns)")
 
-    # Build zip archive
-    with zipfile.ZipFile(zip_out, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        for rel_path in REQUIRED_FILES:
-            file_path = root / rel_path
-            z.write(file_path, arcname=rel_path)
-            print(f"  [ARCHIVED] {rel_path}")
+def build_bundle(zip_path=ZIP):
+    out = ROOT / zip_path
+    out.parent.mkdir(parents=True, exist_ok=True)
+    data = {}
+    for rel in REQUIRED_FILES:
+        data[rel] = committed(rel)
+        print(f"  [OK] {rel} ({len(data[rel])} bytes)")
 
-    print(f"\nSuccessfully generated submission bundle: {zip_out} ({zip_out.stat().st_size >> 10} KB)")
+    rows = [l.split() for l in data["estimated_trajectory.txt"].decode().splitlines()
+            if l.strip() and not l.startswith("#")]
+    if not rows or any(len(r) != 8 for r in rows):
+        raise ValueError("estimated_trajectory.txt: every row must have 8 columns")
+    print(f"  [OK] estimated_trajectory.txt: {len(rows)} rows of 8 columns")
+
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        for rel, b in data.items():
+            z.writestr(rel, b)
+    with zipfile.ZipFile(out) as z:
+        assert all(z.read(rel) == b for rel, b in data.items())
+    print(f"\nBuilt {out} ({out.stat().st_size >> 10} KB), contents checked against the last commit")
+
 
 if __name__ == "__main__":
     build_bundle()

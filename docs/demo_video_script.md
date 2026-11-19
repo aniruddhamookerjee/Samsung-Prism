@@ -3,7 +3,7 @@
 
 **Presenter**: Manas Jangid, on behalf of Team Prism PathFinders
 **Format**: screen capture with voiceover: slides, then a live terminal, then the figures.
-**Slides**: `presentation/CollegeName_TeamName.pptx` (built by `python tools/make_presentation.py`).
+**Slides**: `presentation/SRMIST_KTR_PrismPathFinders.pptx` (built by `python tools/make_presentation.py`).
 
 ---
 

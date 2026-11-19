@@ -1,5 +1,5 @@
 # Samsung PRISM XR Hackathon 2026 - Track 3: Path Finder
-## 9-Slide Official Presentation Deck: `CollegeName_TeamName`
+## 9-Slide Official Presentation Deck: `SRMIST_KTR_PrismPathFinders`
 
 ---
 
@@ -10,7 +10,7 @@
   - *Sarthak Singh* (Lead, Estimator Core)
   - *Aniruddha Mookerjee* (Data, Degradation & Benchmark Harness)
   - *Manas Jangid* (Robustness, Blind Predictor, Packaging & Submission)
-- **Institution**: CollegeName
+- **Institution**: SRM Institute of Science and Technology, Kattankulathur (KTR) campus
 - **Submission Date**: November 2026
 
 ---
@@ -123,7 +123,7 @@
   - **Early Jamming Ramp (`early`, $\gamma = 0.7$)**: Operates cleanly when jamming occurs immediately at takeoff.
   - **Edge Cases**: Zero crashes on ultra-short recordings (10s, 3s) and 4-row tiny files.
   - **Odd Inputs**: 50 to 400 Hz, a 6.5 min file, 5 s gaps, out-of-order and duplicated rows, nan values, CRLF and scientific notation, no header, swapped columns: row count and timestamps always exact, no nan in the output.
-- **Automated Submission Builder**: One-step creation of verified `team_name.zip` with automated checksum and format validation.
+- **Automated Submission Builder**: One-step creation of verified `bundle/PrismPathFinders.zip` with automated checksum and format validation.
 
 ---
 

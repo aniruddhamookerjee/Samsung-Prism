@@ -1,11 +1,10 @@
-"""Builds the 9-slide deck presentation/CollegeName_TeamName.pptx.
+"""Builds the 9-slide deck presentation/SRMIST_KTR_PrismPathFinders.pptx.
 
     pip install python-pptx
     python tools/make_presentation.py
 
 The tumvi_room1 numbers are read from metadata.json, the figures from
 docs/figures (redraw them with tools/plot_drag.py and tools/plot_path.py).
-Set COLLEGE and TEAM below before the final build.
 """
 
 import json
@@ -17,7 +16,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.util import Inches, Pt
 
-COLLEGE = "CollegeName"          # <- fill in
+COLLEGE = "SRM Institute of Science and Technology, KTR campus"
 TEAM = "Team Prism PathFinders"
 MEMBERS = [("Sarthak Singh", "Lead, estimator core"),
            ("Aniruddha Mookerjee", "Data, degradation and scoring"),
@@ -145,7 +144,7 @@ def table(slide, x, y, w, rows, col_w, size=14, highlight_col=None):
     return shape
 
 
-def create_deck(output_path=ROOT / "presentation" / "CollegeName_TeamName.pptx"):
+def create_deck(output_path=ROOT / "presentation" / "SRMIST_KTR_PrismPathFinders.pptx"):
     meta = json.loads((ROOT / "metadata.json").read_text(encoding="utf-8"))
     acc, perf = meta["accuracy_metrics"], meta["performance"]
 

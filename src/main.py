@@ -153,6 +153,12 @@ def read_imu(path):
     ts = np.frombuffer(ts, dtype=np.int64) if len(ts) else np.zeros(0, np.int64)
     imu = (np.frombuffer(vals, dtype=np.float32).reshape(-1, 6) if len(vals)
            else np.zeros((0, 6), np.float32))
+    # a row with nan or inf in it carries nothing usable: blank it, so the
+    # cleaning step drops it like any other missing sample (one bad value
+    # would otherwise turn the whole trajectory into nan)
+    bad = ~np.isfinite(imu).all(axis=1)
+    if bad.any():
+        imu[bad] = 0.0
     return ts, imu
 
 

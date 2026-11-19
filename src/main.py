@@ -76,6 +76,7 @@ CFG = {
     "ground_buzz": 0.6,    # blocks with less than this fraction of the typical motor buzz are on the ground
     "ground_smooth_s": 1.0,
     "drag_offset_ridge": 0.6,  # >0: side-axis offsets from a zero mean velocity in the room
+    "pin_z": 1,            # drone on the ground: height held at one floor level
     "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
     "drag_cross_hz": 0.08, # below this, horizontal position comes from drag velocity
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
@@ -565,6 +566,37 @@ def drag_velocity(q, acc, d, fs, bgap):
     return qrot(qb, vbody), ground
 
 
+def pin_ground(p, ground, fs):
+    """While the drone sits on the ground its height is the floor's: hold every
+    ground stretch at one level and spread the correction linearly over the
+    flight in between."""
+    n = len(p)
+    g = ground.copy()
+    # stretches shorter than a second are motor hiccups, not landings
+    i = 0
+    runs = []
+    while i < n:
+        if g[i]:
+            j = i
+            while j < n and g[j]:
+                j += 1
+            if j - i >= int(fs):
+                runs.append((i, j))
+            i = j
+        else:
+            i += 1
+    if not runs:
+        return p
+    p = p.copy()
+    idx = np.arange(n)
+    on = np.zeros(n, bool)
+    for a, b in runs:
+        on[a:b] = True
+    c = p[on, 2] - median(p[on, 2])
+    p[:, 2] -= np.interp(idx, idx[on], c)
+    return p
+
+
 def band_integrate(a, fs, vel=None):
     """Position from acceleration: divide by -(2 pi f)^2 inside a smooth pass band.
 
@@ -738,6 +770,8 @@ def estimate(ts, imu):
         else:
             home = (p[:n0] * quality[:n0]).mean(axis=0)
         p *= quality
+        if drag is not None and CFG["pin_z"]:
+            p = pin_ground(p, drag[1][:len(p)], CFG["pos_hz"])
         pt = grid0 + (np.arange(len(p)) + 0.5) * d / fs
         del acc_w
     else:

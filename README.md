@@ -78,15 +78,21 @@ and the fit from the tilt drift can settle in the wrong place (heading off by
 its part along gravity removed, and that result is kept when it leaves at least
 20% less tilt drift: MH_04 cut to start mid-flight goes from 6.52 to 4.22 m,
 MH_03 from 3.33 to 2.82 m.
+The damage also scales the gyro, which turns fast rotation into attitude error
+(2% of 2 rad/s is 24 degrees in 10 s), faster than the 30 s gravity average
+follows: on tumvi_room3 the tilt error reaches 6.5 degrees in the last 20 s,
+where the device spins at 2.1 rad/s (0.7 degrees on the clean recording). The
+short tilt window is now also blended in where the device rotates fast, which
+takes tumvi_room3 from 0.61 to 0.58 m.
 
-### Results (sarthak-v7, metres)
+### Results (sarthak-v8, metres)
 
 | recording | stay-still ate | ours ate | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- |
 | V1_02_medium | 1.78 | 1.18 | 1.04 | 0.51 |
 | V1_03_difficult | 1.58 | 1.07 | 1.27 | 0.63 |
 | MH_04_difficult | 6.81 | 4.07 | 3.85 | 0.85 |
-| tumvi_room1 | 1.00 | 0.32 | 0.63 | 0.60 |
+| tumvi_room1 | 1.00 | 0.32 | 0.63 | 0.61 |
 
 Across the default, raw-order and four harsher stress sets (24 runs), the path
 error is 0.62 of stay-still on average (v3, before rotor drag: 0.77) and below it
@@ -102,12 +108,12 @@ against the ground truth.
 | --- | --- | --- | --- | --- | --- |
 | V2_02_medium | 2.12 | 1.46 | 1.51 | 2.69 | 2.73 |
 | MH_03_medium | 3.59 | 2.23 | 2.57 | 3.09 | 2.02 |
-| tumvi_room2 | 1.22 | 0.32 | 0.34 | 0.72 | 0.68 |
-| tumvi_room3 | 1.25 | 0.61 | 0.58 | 0.70 | 0.75 |
-| tumvi_room4 | 1.08 | 0.77 | 0.79 | 0.78 | 0.76 |
+| tumvi_room2 | 1.22 | 0.32 | 0.34 | 0.72 | 0.66 |
+| tumvi_room3 | 1.25 | 0.58 | 0.55 | 0.70 | 0.65 |
+| tumvi_room4 | 1.08 | 0.78 | 0.79 | 0.78 | 0.77 |
 
 All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
-start mid-flight, the 15 held-out runs average 0.65 of stay-still on the path
+start mid-flight, the 15 held-out runs average 0.64 of stay-still on the path
 (worst 1.05, V2_02 cut to start mid-flight) and 0.88 on the blind 5 s. This check found two real bugs,
 both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
 bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight

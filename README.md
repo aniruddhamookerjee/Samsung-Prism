@@ -63,6 +63,9 @@ still explains most of the motion between 0.003 and 0.02 Hz at a small gain.
 For the blind 5 s on a drone, the target height is the floor level measured on
 the ground stretches: in the ground truth every practice flight ends within
 about 0.15 m of its take-off height.
+A dropout longer than 0.3 s is never taken for the ground (its interpolated
+samples carry no motor buzz), and the drag velocity is bridged across it: on the
+2 s gap set the dropout error falls from 4.78 to 4.35 m on MH_04.
 
 ### Results (sarthak-v7, metres)
 

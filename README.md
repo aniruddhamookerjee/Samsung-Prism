@@ -72,6 +72,12 @@ horizontal path is scaled by the expected cosine of the heading error, which
 grows with the gap's length times the file's typical turn rate. On the 2 s and
 5 s gap sets this takes the path from 0.84 to 0.79 of stay-still (worst run
 1.23 to 1.01) and the dropout error from 0.95 to 0.86.
+A file that starts mid-flight has no still start to read the gyro bias from,
+and the fit from the tilt drift can settle in the wrong place (heading off by
+60 to 160 degrees). The fit now also starts from the median gyro reading, with
+its part along gravity removed, and that result is kept when it leaves at least
+20% less tilt drift: MH_04 cut to start mid-flight goes from 6.52 to 4.22 m,
+MH_03 from 3.33 to 2.82 m.
 
 ### Results (sarthak-v7, metres)
 
@@ -126,8 +132,8 @@ against the ground truth.
 | tumvi_room4 | 1.08 | 0.77 | 0.79 | 0.78 | 0.76 |
 
 All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
-start mid-flight, the 15 held-out runs average 0.68 of stay-still on the path
-(worst 1.05, V2_02 cut to start mid-flight) and 0.90 on the blind 5 s. This check found two real bugs,
+start mid-flight, the 15 held-out runs average 0.65 of stay-still on the path
+(worst 1.05, V2_02 cut to start mid-flight) and 0.88 on the blind 5 s. This check found two real bugs,
 both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
 bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight
 had no bias estimate at all. The rotor-drag step was tuned on the first four

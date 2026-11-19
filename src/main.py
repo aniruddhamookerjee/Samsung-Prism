@@ -20,7 +20,8 @@ Pipeline
                  on a multirotor (detected from motor buzz), slow horizontal
                  motion comes instead from rotor drag: the accelerometer axes
                  across the thrust read -0.2 x velocity, so velocity is measured
-                 directly and only integrated once
+                 directly and only integrated once; on the ground (motor buzz
+                 drops) the velocity is zero
     6. blind     after the sensor dies, coast briefly, then head for the
                  estimated start point, averaged over the first 12 s
                  (the practice flights end where they began)
@@ -67,14 +68,17 @@ CFG = {
     "coast_tau_s": 0.6,    # blind segment: velocity decays with this time constant
     "return_tau_s": 1.0,   # blind segment: move to the target with this time constant
     "blind_home": 1.0,     # blind target: 0 = path centre, 1 = estimated start point
+    "home_raw_drag": 1,    # blind target from the track without ground detection
     "home_s": 12.0,        # the start point is the mean over this many seconds
     "drag": 1,             # use rotor drag for horizontal velocity when the file looks like a multirotor
     "drag_vib": 0.7,       # m/s^2 of motor buzz that marks a multirotor
     "drag_k": 0.2,         # 1/s, rotor drag constant (EuRoC fits 0.18 to 0.22)
+    "ground_buzz": 0.6,    # blocks with less than this fraction of the typical motor buzz are on the ground
+    "ground_smooth_s": 1.0,
     "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
     "drag_cross_hz": 0.08, # below this, horizontal position comes from drag velocity
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
-    "drag_gain": 0.45,     # shrink, for the same reason as gain
+    "drag_gain": 0.65,     # shrink, for the same reason as gain
     "pos_hz": 20.0,        # rate of the position work
     "long_gap_s": 0.3,     # a dropout longer than this splits the attitude fix
     "gyro_noise_ref": 0.35,  # rad/s of sample-to-sample gyro jitter where trust halves
@@ -481,14 +485,18 @@ def attitude(g, fs, d, calib_n, bgap, seg):
 # ---------------------------------------------------------------- 5. position
 
 def block_body_acc(acc, d):
-    """Body-frame acceleration averaged over blocks of d samples."""
+    """Body-frame acceleration averaged over blocks of d samples, and its spread inside each block."""
     nb = len(acc) // d
     out = np.empty((nb, 3))
+    spread = np.empty(nb)
     step = max(CHUNK // d, 1) * d
     for s in range(0, nb * d, step):
         e = min(s + step, nb * d)
-        out[s // d:e // d] = acc[s:e].astype(np.float64).reshape(-1, d, 3).mean(axis=1)
-    return out
+        b = acc[s:e].astype(np.float64).reshape(-1, d, 3)
+        m = b.mean(axis=1)
+        out[s // d:e // d] = m
+        spread[s // d:e // d] = np.sqrt(((b - m[:, None, :]) ** 2).sum(axis=2).mean(axis=1))
+    return out, spread
 
 
 def vibration(acc, d):
@@ -517,22 +525,34 @@ def drag_velocity(q, acc, d, fs, bgap):
     """
     if vibration(acc, d) < CFG["drag_vib"]:
         return None
-    ab = block_body_acc(acc, d)
+    ab, buzz = block_body_acc(acc, d)
     nb = len(ab)
     ok = ~bgap[:nb]
     if ok.sum() < int(20 * fs):
         return None
-    thrust = int(np.argmax(np.abs(ab[ok].mean(axis=0))))
+    # on the ground (motors off or idling) the side axes read the pad's tilt,
+    # not drag: there the velocity is zero, and the flight is what calibrates
+    buzz = smooth(buzz[:, None], max(int(CFG["ground_smooth_s"] * fs), 1))[:, 0]
+    ground = buzz < CFG["ground_buzz"] * median(buzz[ok])
+    fly = ok & ~ground
+    if fly.sum() < int(20 * fs):
+        return None
+    # the thrust direction in the sensor frame is the mean specific force in
+    # flight; the IMU need not be mounted square to it (EuRoC is about 20 deg
+    # off), so drag is read on the two directions perpendicular to it
+    u = ab[fly].mean(axis=0)
+    u /= np.linalg.norm(u)
+    e1 = np.cross(u, np.eye(3)[int(np.argmin(np.abs(u)))])
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(u, e1)
     vbody = np.zeros((nb, 3))
     sm = max(int(CFG["drag_smooth_s"] * fs), 1)
-    for k in range(3):
-        if k == thrust:
-            continue
-        x = smooth(ab[:, k:k + 1], sm)[:, 0]
-        vbody[:, k] = -(x - x[ok].mean()) / CFG["drag_k"]
-    vbody[~ok] = 0.0
+    for e in (e1, e2):
+        x = smooth((ab @ e)[:, None], sm)[:, 0]
+        vbody -= ((x - x[fly].mean()) / CFG["drag_k"])[:, None] * e[None, :]
+    vbody[~fly] = 0.0
     qb = q[(np.arange(nb) * d + d // 2)].astype(np.float64)
-    return qrot(qb, vbody)
+    return qrot(qb, vbody), ground
 
 
 def band_integrate(a, fs, vel=None):
@@ -636,8 +656,7 @@ def poses(tc, model, v_end):
         back = np.exp(-dt / CFG["return_tau_s"])[:, None]
         # practice flights end where they began (landing pad, loop), so head
         # for a blend of the estimated start point and the path centre
-        n0 = max(1, min(len(p), int(CFG["home_s"] * CFG["pos_hz"])))
-        target = CFG["blind_home"] * p[:n0].mean(axis=0)
+        target = CFG["blind_home"] * model["home"]
         pos[after] = target + (p[-1] - target) * back + k[:, None] * v_end
         quat[after] = q[-1]
     quat /= np.linalg.norm(quat, axis=1, keepdims=True)
@@ -695,15 +714,28 @@ def estimate(ts, imu):
         acc_w[:, 2] -= g_mag
         acc_w[bgap] = 0.0          # nothing was measured there
         drag = drag_velocity(q, g[:, 3:6], d, fs / d, bgap) if CFG["drag"] else None
-        p = band_integrate(acc_w, fs / d, drag)
-        p *= gyro_quality(g[:, 0:3], d)[:, None]
+        p = band_integrate(acc_w, fs / d, None if drag is None else drag[0])
+        quality = gyro_quality(g[:, 0:3], d)[:, None]
+        n0 = max(1, min(len(p), int(CFG["home_s"] * CFG["pos_hz"])))
+        if drag is not None and CFG["home_raw_drag"]:
+            # the blind target is read from a track that keeps drag on the pad
+            # too; on the practice flights it lands nearer the true start
+            keep = CFG["ground_buzz"]
+            CFG["ground_buzz"] = 0.0
+            raw = drag_velocity(q, g[:, 3:6], d, fs / d, bgap)
+            CFG["ground_buzz"] = keep
+            home = (band_integrate(acc_w, fs / d, raw[0])[:n0] * quality[:n0]).mean(axis=0)
+        else:
+            home = (p[:n0] * quality[:n0]).mean(axis=0)
+        p *= quality
         pt = grid0 + (np.arange(len(p)) + 0.5) * d / fs
         del acc_w
     else:
         p = np.zeros((1, 3))
         pt = np.array([grid0])
+        home = np.zeros(3)
     del g
-    return {"grid0": grid0, "fs": fs, "q": q, "pt": pt, "p": p}
+    return {"grid0": grid0, "fs": fs, "q": q, "pt": pt, "p": p, "home": home}
 
 
 USAGE = """usage: python main.py <imu csv | folder | zip> [output txt]

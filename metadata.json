@@ -12,8 +12,8 @@
   "performance": {
     "runtime_ms_per_second": 3.418,
     "runtime_limit_ms_per_second": 20.0,
-    "peak_memory_mb": 3.372,
-    "peak_memory_with_imports_mb": 10.271,
+    "peak_memory_mb": 3.639,
+    "peak_memory_with_imports_mb": 10.536,
     "peak_memory_limit_mb": 8.0,
     "cpu_threads": 1,
     "memory_measured_as": "tracemalloc peak during main.py, minus what import numpy already holds (FAQ: algorithm / heap level)"

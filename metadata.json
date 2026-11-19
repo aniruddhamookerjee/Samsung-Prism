@@ -12,19 +12,19 @@
   "performance": {
     "runtime_ms_per_second": 3.418,
     "runtime_limit_ms_per_second": 20.0,
-    "peak_memory_mb": 3.691,
-    "peak_memory_with_imports_mb": 10.589,
+    "peak_memory_mb": 3.76,
+    "peak_memory_with_imports_mb": 10.658,
     "peak_memory_limit_mb": 8.0,
     "cpu_threads": 1,
     "memory_measured_as": "tracemalloc peak during main.py, minus what import numpy already holds (FAQ: algorithm / heap level)"
   },
   "accuracy_metrics": {
-    "ate_rmse_meters": 0.32,
+    "ate_rmse_meters": 0.303,
     "stay_still_baseline_ate_meters": 1.0,
-    "blind_5s_rmse_meters": 0.611,
-    "dropout_gap_rmse_meters": 0.338,
-    "rpe_1s_meters": 0.192,
-    "rotation_rmse_degrees": 9.725
+    "blind_5s_rmse_meters": 0.616,
+    "dropout_gap_rmse_meters": 0.307,
+    "rpe_1s_meters": 0.183,
+    "rotation_rmse_degrees": 9.813
   },
   "system_environment": {
     "os": "Windows 11 / Linux (Docker-ready)",

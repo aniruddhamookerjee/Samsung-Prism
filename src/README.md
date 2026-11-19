@@ -33,12 +33,12 @@ python src/main.py <input_path> [output_path]
 | Metric | Hackathon Limit | Our Performance (`tumvi_room1`) | Status |
 | :--- | :--- | :--- | :--- |
 | **Language** | Python only (`main.py`) | Pure Python + NumPy | **PASS (100%)** |
-| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.69 MB** (algorithm buffers) | **PASS (< 50% of budget)** |
+| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.76 MB** (algorithm buffers) | **PASS (< 50% of budget)** |
 | **Execution Speed** | `< 20.0 ms / 1 s data` | **3.42 ms / 1 s data** | **PASS (about 6x under the limit)** |
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
-| **Alignment Score (ATE)**| Baseline: 1.00 m | **0.320 m** (0.32x baseline error) | **EXCEEDS BASELINE** |
-| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.611 m** | **BEATS BASELINE** |
+| **Alignment Score (ATE)**| Baseline: 1.00 m | **0.303 m** (0.30x baseline error) | **EXCEEDS BASELINE** |
+| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.616 m** | **BEATS BASELINE** |
 
 ---
 
@@ -59,7 +59,7 @@ The estimator processes telemetry offline in seven sequential stages:
  3. Resampler (uniform 200 Hz time grid; flags long dropout bursts > 0.3s)
          │
          ▼
- 4. Attitude Estimation (quaternion integration + 30s rolling gravity vector tilt alignment)
+ 4. Attitude Estimation (quaternion integration + 35s rolling gravity vector tilt alignment)
          │
          ▼
  5. Position Estimation (block world-acceleration + bandpass double integration 0.02 - 3.0 Hz)
@@ -83,7 +83,7 @@ The estimator processes telemetry offline in seven sequential stages:
    - **Stuck Samples & Duplicates**: Rejects repeated identical sensor readings ($2 \dots 10$ samples) and duplicate or backward timestamps.
    - **Spike Rejection**: 3-point median filter with rolling local noise estimator. Rejects impulse spikes exceeding $8 \times \sigma_{\text{local}} + \text{threshold}$.
    - **Column Order Invariance**: Automatically detects whether input is EuRoC order (`gyro, accel`) or degradation script order (`accel, gyro`) by evaluating gravitational norms ($|\mathbf{a}| \approx 9.8\text{ m/s}^2$).
-3. **`resample`**: Interpolates non-uniform timestamps across short gaps onto a steady sampling rate ($f_s \approx 200\text{ Hz}$). Dropout bursts exceeding $0.3\text{ s}$ are marked as unmeasured gaps.
+3. **`resample`**: Interpolates non-uniform timestamps across short gaps onto a steady sampling rate ($f_s \approx 200\text{ Hz}$). Dropout bursts exceeding $0.3\text{ s}$ are marked as unmeasured gaps. After any dropout over $0.2	ext{ s}$ the tilt and gyro-bias fits restart.
 4. **`attitude`**:
    - Computes initial gyro bias in a quiescent calibration window ($t \le 2.0\text{ s}$).
    - With no still start (a file that begins mid-flight), fits the gyro bias from how fast the tilt drifts away from gravity, and keeps it only if the fit settles on a plausible value. Where the device rotates fast the tilt correction leans on a shorter (8 s) gravity average, since a gyro scale error turns fast rotation into attitude error. The fit also runs from the median gyro reading (its part along gravity removed), and that result is kept when it leaves at least 20% less tilt drift.

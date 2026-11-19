@@ -32,7 +32,7 @@
 - **Key Tenets**:
   1. **Strict Memory & Speed Budgeting**: Raw C-level streaming buffers (`array.array`), single-threaded NumPy math, chunked file I/O ($< 3\text{ MB}$ peak allocation, $\sim 2.1\text{ ms/s}$ runtime).
   2. **Multi-Stage Anomaly Filtering**: Real-time rejection of duplicate timestamps, stuck sensor states, and 6-channel adaptive local noise spike trimming.
-  3. **Decoupled Orientation & Offline Tilt Locking**: Quiescent bias estimation combined with a 30s rolling gravity-vector projection to eliminate pitch/roll tilt drift.
+  3. **Decoupled Orientation & Offline Tilt Locking**: Quiescent bias estimation combined with a 35s rolling gravity-vector projection to eliminate pitch/roll tilt drift.
   4. **Band-Pass Spectral Integration**: Double integration performed in frequency domain ($0.02\text{ Hz} \dots 3.0\text{ Hz}$) with gains fitted per frequency band against motion-capture ground truth.
   5. **Rotor-Drag Velocity Sensing**: On a drone, the accelerometer axes across the thrust read $-0.2 \times$ velocity, so slow horizontal motion is measured, not double-integrated.
   6. **Kinematic Coasting Blind Predictor**: 0.3 s of velocity coasting, then a return to the estimated take-off point (and, on a drone, the floor height) during the final 5-second blackout.
@@ -54,7 +54,7 @@
    3. Resampler (uniform 200 Hz grid, dropout gap tracking > 0.3s)
                │
                ▼
-   4. Attitude Filter (quaternion rate integration + 30s gravity tilt alignment)
+   4. Attitude Filter (quaternion rate integration + 35s gravity tilt alignment)
                │
                ▼
    5. Position Estimator (block world-acceleration + FFT bandpass integration)
@@ -77,13 +77,13 @@
   - Evaluated on benchmark `tumvi_room1`: 27,330 rows, exactly matching input count and timestamps.
   - Quaternion normalization verified: $\|q\| = 1.0 \pm 10^{-7}$; 0 NaNs, 0 Infs.
 - **Scored Results vs Stay-Still Baseline**:
-  - **Absolute Trajectory Error (ATE)**: **0.320 m** vs 1.000 m baseline (**68% error reduction!**)
-  - **Dropout Gap Window ATE**: **0.338 m** vs 0.869 m baseline (**61% error reduction!**)
-  - **Relative Pose Error (RPE 1s)**: **0.192 m**
-  - **Rotation Error**: **9.725°** across the entire 141-second trajectory.
+  - **Absolute Trajectory Error (ATE)**: **0.303 m** vs 1.000 m baseline (**70% error reduction!**)
+  - **Dropout Gap Window ATE**: **0.307 m** vs 0.869 m baseline (**65% error reduction!**)
+  - **Relative Pose Error (RPE 1s)**: **0.183 m**
+  - **Rotation Error**: **9.813°** across the entire 141-second trajectory.
   - **Peak Memory**: **3.06 MB** (Budget: 8.0 MB — utilizing only 38% of allowed memory).
   - **Processing Speed**: **2.17 ms/s** (Budget: 20.0 ms/s — **9.2x faster than required limit**).
-- **Across all drone and handheld runs**: path error 0.62x and blind 5 s error 0.58x of stay-still over 24 tuning runs; 0.64x path over 15 held-out runs and 0.64x over 10 runs on five recordings never used for tuning.
+- **Across all drone and handheld runs**: path error 0.60x and blind 5 s error 0.58x of stay-still over 24 tuning runs; 0.61x path over 15 held-out runs and 0.64x over 10 runs on five recordings never used for tuning.
 - **Figure for this slide**: `docs/figures/drag.png` (accelerometer-derived velocity vs motion-capture velocity) and `docs/figures/MH_04_difficult.png` (path vs ground truth).
 
 ---

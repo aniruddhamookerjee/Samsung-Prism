@@ -9,10 +9,10 @@ questions are still open and would only change how we present the numbers.
 
 Hello,
 
-We are Team Prism PathFinders, working on Track 3, Path Finder. Two short questions before we submit:
+We are Team SAM, working on Track 3, Path Finder. Two short questions before we submit:
 
 1. Are memory and runtime scored pass/fail against the limits (8 MB, 20 ms per second of data), or ranked, so that lower is better?
 2. Roughly how long is the evaluation recording: a few minutes, like the EuRoC and TUM-VI samples, or much longer?
 
 Thank you,
-Team Prism PathFinders
+Team SAM

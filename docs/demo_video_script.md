@@ -1,16 +1,16 @@
 # Demo Video Script (about 2.5 minutes, never over 3)
 ## Samsung PRISM XR Hackathon 2026 - Track 3: Path Finder
 
-**Presenter**: Manas Jangid, on behalf of Team Prism PathFinders
+**Presenter**: Manas Jangid, on behalf of Team SAM
 **Format**: screen capture with voiceover: slides, then a live terminal, then the figures.
-**Slides**: `presentation/SRMIST_KTR_PrismPathFinders.pptx` (built by `python tools/make_presentation.py`).
+**Slides**: `presentation/SRMIST_KTR_SAM.pptx` (built by `python tools/make_presentation.py`).
 
 ---
 
 ### Segment 1: The problem (0:00 - 0:30)
 - **Visual**: slide 1 (title), then slide 2 (the problem).
 - **Voiceover**:
-  > "Hi, we are Team Prism PathFinders, and this is Path Finder, for Track 3.
+  > "Hi, we are Team SAM, and this is Path Finder, for Track 3.
   >
   > The task: work out where a device went, in full 3D position and orientation, using nothing but its IMU, the gyroscope and accelerometer. And the data is damaged on purpose: noise that grows, drifting bias, spikes, stuck readings, dropouts of up to two seconds, and for the last five seconds the sensor is dead, all zeros.
   >

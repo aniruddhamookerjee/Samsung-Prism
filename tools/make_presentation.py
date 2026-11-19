@@ -1,4 +1,4 @@
-"""Builds the 9-slide deck presentation/SRMIST_KTR_PrismPathFinders.pptx.
+"""Builds the 9-slide deck presentation/SRMIST_KTR_SAM.pptx.
 
     pip install python-pptx
     python tools/make_presentation.py
@@ -17,7 +17,7 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.util import Inches, Pt
 
 COLLEGE = "SRM Institute of Science and Technology, KTR campus"
-TEAM = "Team Prism PathFinders"
+TEAM = "Team SAM"
 MEMBERS = [("Sarthak Singh", "Lead, estimator core"),
            ("Aniruddha Mookerjee", "Data, degradation and scoring"),
            ("Manas Jangid", "Robustness, packaging and submission")]
@@ -144,7 +144,7 @@ def table(slide, x, y, w, rows, col_w, size=14, highlight_col=None):
     return shape
 
 
-def create_deck(output_path=ROOT / "presentation" / "SRMIST_KTR_PrismPathFinders.pptx"):
+def create_deck(output_path=ROOT / "presentation" / "SRMIST_KTR_SAM.pptx"):
     meta = json.loads((ROOT / "metadata.json").read_text(encoding="utf-8"))
     acc, perf = meta["accuracy_metrics"], meta["performance"]
 

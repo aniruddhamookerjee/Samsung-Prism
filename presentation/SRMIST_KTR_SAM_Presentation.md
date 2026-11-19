@@ -1,12 +1,12 @@
 # Samsung PRISM XR Hackathon 2026 - Track 3: Path Finder
-## 9-Slide Official Presentation Deck: `SRMIST_KTR_PrismPathFinders`
+## 9-Slide Official Presentation Deck: `SRMIST_KTR_SAM`
 
 ---
 
 ### Slide 1: Title
 - **Headline**: Path Finder: 6-DoF Trajectory Estimation Under Heavy IMU Degradation
 - **Subtitle**: Samsung PRISM XR Hackathon 2026 — Track 3
-- **Team**: Team Prism PathFinders
+- **Team**: Team SAM
   - *Sarthak Singh* (Lead, Estimator Core)
   - *Aniruddha Mookerjee* (Data, Degradation & Benchmark Harness)
   - *Manas Jangid* (Robustness, Blind Predictor, Packaging & Submission)
@@ -123,7 +123,7 @@
   - **Early Jamming Ramp (`early`, $\gamma = 0.7$)**: Operates cleanly when jamming occurs immediately at takeoff.
   - **Edge Cases**: Zero crashes on ultra-short recordings (10s, 3s) and 4-row tiny files.
   - **Odd Inputs**: 50 to 400 Hz, a 6.5 min file, 5 s gaps, out-of-order and duplicated rows, nan values, CRLF and scientific notation, no header, swapped columns: row count and timestamps always exact, no nan in the output.
-- **Automated Submission Builder**: One-step creation of verified `bundle/PrismPathFinders.zip` with automated checksum and format validation.
+- **Automated Submission Builder**: One-step creation of verified `bundle/SAM.zip` with automated checksum and format validation.
 
 ---
 
@@ -131,6 +131,6 @@
 - **Repository**: [https://github.com/aniruddhamookerjee/Samsung-Prism.git](https://github.com/aniruddhamookerjee/Samsung-Prism.git)
 - **Branch**: `main`
 - **Contact & Clarifications**: Sent to `prism@samsung.com`
-- **Team Prism PathFinders**:
+- **Team SAM**:
   - *Sarthak Singh* | *Aniruddha Mookerjee* | *Manas Jangid*
 - Ready for Final Samsung Jury Demo on December 9, 2026!

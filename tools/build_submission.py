@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds and checks bundle/PrismPathFinders.zip for the Track 3 submission.
+"""Builds and checks bundle/SAM.zip for the Track 3 submission.
 
     python tools/build_submission.py
 
@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ZIP = "bundle/PrismPathFinders.zip"
+ZIP = "bundle/SAM.zip"
 REQUIRED_FILES = [
     "src/main.py",
     "src/README.md",
@@ -22,8 +22,8 @@ REQUIRED_FILES = [
     "metadata.json",
     "requirements.txt",
     "Dockerfile",
-    "presentation/SRMIST_KTR_PrismPathFinders_Presentation.md",
-    "presentation/SRMIST_KTR_PrismPathFinders.pptx",
+    "presentation/SRMIST_KTR_SAM_Presentation.md",
+    "presentation/SRMIST_KTR_SAM.pptx",
 ]
 
 

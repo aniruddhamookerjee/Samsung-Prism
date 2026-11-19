@@ -56,12 +56,12 @@ CFG = {
     "still_acc_std": 1.0,  # m/s^2 of accel jitter still counted as standing (motors idling)
     "tilt_window_s": 30.0, # averaging window for the gravity direction
     "tilt_window_noisy_s": 8.0,   # the same where the gyro is mostly noise
-    "band_lo_hz": 0.02,    # position keeps motion above this frequency ...
-    "band_hi_hz": 0.04,    # ... fully above this one, with a smooth ramp between
+    "band_lo_hz": 0.03,    # position keeps motion above this frequency ...
+    "band_hi_hz": 0.05,    # ... fully above this one, with a smooth ramp between
     "lp_hz": 3.0,          # above this, acceleration is vibration
-    "gain": 0.25,          # horizontal shrink below split_hz: a too-large path costs more than a small one
-    "gain_hi": 0.9,        # horizontal shrink above split_hz
-    "split_hz": 0.08,
+    "gain": 0.15,          # horizontal shrink below split_hz: a too-large path costs more than a small one
+    "gain_hi": 1.0,        # horizontal shrink above split_hz
+    "split_hz": 0.065,
     "z_gain": 0.3,         # vertical shrink below split_hz
     "z_gain_hi": 0.9,      # vertical shrink above split_hz
     "z_band_lo_hz": 0.02,  # vertical pass band starts here
@@ -75,6 +75,8 @@ CFG = {
     "drag_k": 0.2,         # 1/s, rotor drag constant (EuRoC fits 0.18 to 0.22)
     "ground_buzz": 0.6,    # blocks with less than this fraction of the typical motor buzz are on the ground
     "ground_smooth_s": 1.0,
+    "drag_offset_ridge": 0.6,  # >0: side-axis offsets from a zero mean velocity in the room
+    "pin_z": 1,            # drone on the ground: height held at one floor level
     "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
     "drag_cross_hz": 0.08, # below this, horizontal position comes from drag velocity
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
@@ -545,14 +547,54 @@ def drag_velocity(q, acc, d, fs, bgap):
     e1 = np.cross(u, np.eye(3)[int(np.argmin(np.abs(u)))])
     e1 /= np.linalg.norm(e1)
     e2 = np.cross(u, e1)
-    vbody = np.zeros((nb, 3))
     sm = max(int(CFG["drag_smooth_s"] * fs), 1)
-    for e in (e1, e2):
-        x = smooth((ab @ e)[:, None], sm)[:, 0]
-        vbody -= ((x - x[fly].mean()) / CFG["drag_k"])[:, None] * e[None, :]
-    vbody[~fly] = 0.0
+    x = np.column_stack([smooth((ab @ e)[:, None], sm)[:, 0] for e in (e1, e2)])
+    c = x[fly].mean(axis=0)
     qb = q[(np.arange(nb) * d + d // 2)].astype(np.float64)
+    if CFG["drag_offset_ridge"] > 0:
+        # the flights end where they began, so the mean velocity in the room
+        # is zero; with the drone turning, that pins the side-axis offsets
+        # better than assuming a zero mean in the drone's own frame
+        w1 = qrot(qb[fly], np.tile(e1, (int(fly.sum()), 1)))[:, :2]
+        w2 = qrot(qb[fly], np.tile(e2, (int(fly.sum()), 1)))[:, :2]
+        A = np.column_stack([w1.mean(axis=0), w2.mean(axis=0)])
+        b = (w1 * x[fly, 0:1] + w2 * x[fly, 1:2]).mean(axis=0)
+        lam = CFG["drag_offset_ridge"]
+        c = np.linalg.solve(A.T @ A + lam * np.eye(2), A.T @ b + lam * c)
+    vbody = -((x - c) / CFG["drag_k"]) @ np.stack([e1, e2])
+    vbody[~fly] = 0.0
     return qrot(qb, vbody), ground
+
+
+def pin_ground(p, ground, fs):
+    """While the drone sits on the ground its height is the floor's: hold every
+    ground stretch at one level and spread the correction linearly over the
+    flight in between."""
+    n = len(p)
+    g = ground.copy()
+    # stretches shorter than a second are motor hiccups, not landings
+    i = 0
+    runs = []
+    while i < n:
+        if g[i]:
+            j = i
+            while j < n and g[j]:
+                j += 1
+            if j - i >= int(fs):
+                runs.append((i, j))
+            i = j
+        else:
+            i += 1
+    if not runs:
+        return p
+    p = p.copy()
+    idx = np.arange(n)
+    on = np.zeros(n, bool)
+    for a, b in runs:
+        on[a:b] = True
+    c = p[on, 2] - median(p[on, 2])
+    p[:, 2] -= np.interp(idx, idx[on], c)
+    return p
 
 
 def band_integrate(a, fs, vel=None):
@@ -728,6 +770,8 @@ def estimate(ts, imu):
         else:
             home = (p[:n0] * quality[:n0]).mean(axis=0)
         p *= quality
+        if drag is not None and CFG["pin_z"]:
+            p = pin_ground(p, drag[1][:len(p)], CFG["pos_hz"])
         pt = grid0 + (np.arange(len(p)) + 0.5) * d / fs
         del acc_w
     else:

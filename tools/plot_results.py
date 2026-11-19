@@ -160,7 +160,7 @@ def chart_budget(ours, out):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--label", default="sarthak-v6")
+    ap.add_argument("--label", default="sarthak-v7")
     ap.add_argument("--base", default="stay-still")
     ap.add_argument("--results", default="results/results.csv")
     ap.add_argument("--out", default="docs/figures")

@@ -60,19 +60,22 @@ integrated, but the slow motion is still there: a second-order high pass
 (corner 0.015 Hz, gain 0.7) keeps it instead of cutting everything below 0.01 Hz.
 A per-band fit against the ground truth showed the integrated drag velocity
 still explains most of the motion between 0.003 and 0.02 Hz at a small gain.
+For the blind 5 s on a drone, the target height is the floor level measured on
+the ground stretches: in the ground truth every practice flight ends within
+about 0.15 m of its take-off height.
 
 ### Results (sarthak-v7, metres)
 
 | recording | stay-still ate | ours ate | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.18 | 1.04 | 0.57 |
-| V1_03_difficult | 1.58 | 1.07 | 1.27 | 0.66 |
+| V1_02_medium | 1.78 | 1.18 | 1.04 | 0.51 |
+| V1_03_difficult | 1.58 | 1.07 | 1.27 | 0.63 |
 | MH_04_difficult | 6.81 | 4.07 | 3.85 | 0.85 |
 | tumvi_room1 | 1.00 | 0.32 | 0.63 | 0.60 |
 
 Across the default, raw-order and four harsher stress sets (24 runs), the path
 error is 0.62 of stay-still on average (v3, before rotor drag: 0.77) and below it
-in every run; the blind error is 0.60 of stay-still (v3: 0.98). Peak memory is 2.8 to 4.4 MB
+in every run; the blind error is 0.58 of stay-still (v3: 0.98). Peak memory is 2.8 to 4.4 MB
 (tracemalloc, after `import numpy`), runtime 1.4 to 2.9 ms per second of data.
 `python tools/evalall.py` prints these ratios for every local set at once,
 `python tools/plot_path.py data/degraded/tumvi_room1` draws the estimate
@@ -82,15 +85,15 @@ against the ground truth.
 
 | recording | stay-still ate | ours ate | ours, raw column order | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- | --- |
-| V2_02_medium | 2.12 | 1.46 | 1.51 | 2.69 | 2.74 |
-| MH_03_medium | 3.59 | 2.23 | 2.57 | 3.09 | 2.01 |
+| V2_02_medium | 2.12 | 1.46 | 1.51 | 2.69 | 2.73 |
+| MH_03_medium | 3.59 | 2.23 | 2.57 | 3.09 | 2.02 |
 | tumvi_room2 | 1.22 | 0.32 | 0.34 | 0.72 | 0.68 |
 | tumvi_room3 | 1.25 | 0.61 | 0.58 | 0.70 | 0.75 |
 | tumvi_room4 | 1.08 | 0.77 | 0.79 | 0.78 | 0.76 |
 
 All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
 start mid-flight, the 15 held-out runs average 0.68 of stay-still on the path
-(worst 1.05, V2_02 cut to start mid-flight) and 0.91 on the blind 5 s. This check found two real bugs,
+(worst 1.05, V2_02 cut to start mid-flight) and 0.90 on the blind 5 s. This check found two real bugs,
 both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
 bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight
 had no bias estimate at all. The rotor-drag step was tuned on the first four

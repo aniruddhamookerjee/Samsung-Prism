@@ -83,6 +83,7 @@ CFG = {
     "drag_fc_keep": 1,      # ... on top of the drag_lo_hz ramp, never below it
     "drag_fc_scale": 0.7,   # ... scaled by this
     "home_fc_hz": 0.0,      # the blind target keeps the plain ramp
+    "home_floor_z": 1,       # drone: blind target height = floor level (they land where they took off)
     "drag_lo_hz": 0.01,    # drag velocity is integrated above this
     "drag_gain": 0.65,     # shrink, for the same reason as gain
     "pos_hz": 20.0,        # rate of the position work
@@ -785,6 +786,9 @@ def estimate(ts, imu):
         p *= quality
         if drag is not None and CFG["pin_z"]:
             p = pin_ground(p, drag[1][:len(p)], CFG["pos_hz"])
+            gr = drag[1][:len(p)]
+            if CFG["home_floor_z"] and gr.any():
+                home[2] = median(p[gr, 2])
         pt = grid0 + (np.arange(len(p)) + 0.5) * d / fs
         del acc_w
     else:

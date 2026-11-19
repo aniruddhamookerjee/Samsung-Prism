@@ -33,12 +33,12 @@ python src/main.py <input_path> [output_path]
 | Metric | Hackathon Limit | Our Performance (`tumvi_room1`) | Status |
 | :--- | :--- | :--- | :--- |
 | **Language** | Python only (`main.py`) | Pure Python + NumPy | **PASS (100%)** |
-| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.76 MB** (algorithm buffers) | **PASS (< 50% of budget)** |
+| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.77 MB** (algorithm buffers) | **PASS (< 50% of budget)** |
 | **Execution Speed** | `< 20.0 ms / 1 s data` | **3.42 ms / 1 s data** | **PASS (about 6x under the limit)** |
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
 | **Alignment Score (ATE)**| Baseline: 1.00 m | **0.293 m** (0.29x baseline error) | **EXCEEDS BASELINE** |
-| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.613 m** | **BEATS BASELINE** |
+| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.611 m** | **BEATS BASELINE** |
 
 ---
 

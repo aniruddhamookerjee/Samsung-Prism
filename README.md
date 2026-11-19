@@ -98,9 +98,9 @@ Organisers' damage, default column order:
 
 | recording | stay-still ate | ours ate | ours / stay-still | stay-still blind | ours blind | stay-still gaps | ours gaps | rotation (deg) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.18 | 0.66 | 1.04 | 0.52 | 1.61 | 1.13 | 3.2 |
-| V1_03_difficult | 1.58 | 1.07 | 0.68 | 1.27 | 0.62 | 1.09 | 0.91 | 7.3 |
-| MH_04_difficult | 6.81 | 4.07 | 0.60 | 3.85 | 0.83 | 7.87 | 3.77 | 16.1 |
+| V1_02_medium | 1.78 | 1.14 | 0.64 | 1.04 | 0.47 | 1.61 | 1.09 | 3.2 |
+| V1_03_difficult | 1.58 | 1.07 | 0.67 | 1.27 | 0.59 | 1.09 | 0.94 | 7.3 |
+| MH_04_difficult | 6.81 | 4.08 | 0.60 | 3.85 | 0.62 | 7.87 | 3.76 | 15.6 |
 | tumvi_room1 | 1.00 | 0.30 | 0.30 | 0.63 | 0.62 | 0.87 | 0.31 | 9.8 |
 
 Every damage type, as a fraction of stay-still (mean of the 4 recordings, worst in brackets):

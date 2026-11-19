@@ -227,14 +227,14 @@ def create_deck(output_path=ROOT / "presentation" / "SRMIST_KTR_SAM.pptx"):
     s = prs.slides.add_slide(blank)
     header(s, 5, "Results", "Error in metres after rigid alignment; stay-still = output the start point every time")
     rows = [["recording", "path: stay-still", "path: ours", "blind 5 s: stay-still", "blind 5 s: ours"],
-            ["MH_04_difficult (drone)", "6.81", "4.07", "3.85", "0.85"],
-            ["V1_02_medium (drone)", "1.78", "1.18", "1.04", "0.51"],
-            ["V1_03_difficult (drone)", "1.58", "1.07", "1.27", "0.63"],
+            ["MH_04_difficult (drone)", "6.81", "4.08", "3.85", "0.62"],
+            ["V1_02_medium (drone)", "1.78", "1.14", "1.04", "0.47"],
+            ["V1_03_difficult (drone)", "1.58", "1.07", "1.27", "0.59"],
             ["tumvi_room1 (handheld, submitted)", "1.00", f"{acc['ate_rmse_meters']:.2f}", "0.63",
              f"{acc['blind_5s_rmse_meters']:.2f}"]]
     table(s, Inches(0.6), Inches(1.6), Inches(7.6), rows, [2.8, 1.15, 1.0, 1.4, 1.25], size=13, highlight_col=2)
     bullets(s, Inches(0.6), Inches(3.9), Inches(7.6), Inches(3), [
-        ("49 runs, 3 groups (path / blind, x stay-still):", "tuning 0.61 / 0.57; held-out 0.60 / 0.88; five recordings never used for tuning 0.62 / 0.73; 39 runs re-damaged with fresh random seeds 0.58 / 0.78."),
+        ("49 runs, 3 groups (path / blind, x stay-still):", "tuning 0.60 / 0.54; held-out 0.60 / 0.88; five recordings never used for tuning 0.62 / 0.74; 39 runs re-damaged with fresh random seeds 0.57 / 0.77."),
         ("Submitted file (tumvi_room1):", f"dropout windows {acc['dropout_gap_rmse_meters']:.2f} m (stay-still 0.87), "
                                           f"1 s drift {acc['rpe_1s_meters']:.2f} m, rotation {acc['rotation_rmse_degrees']:.1f} deg."),
         ("Resources:", f"peak memory {perf['peak_memory_mb']:.1f} MB of 8 (algorithm level, as the FAQ measures), {perf['runtime_ms_per_second']:.1f} ms per second of data of 20."),
@@ -251,7 +251,7 @@ def create_deck(output_path=ROOT / "presentation" / "SRMIST_KTR_SAM.pptx"):
     bullets(s, Inches(8.3), Inches(1.5), Inches(4.7), Inches(5.4), [
         ("Physics:", "thrust is along one body axis, so the other two accelerometer axes see only rotor drag, a = -k v."),
         ("Measured:", "every EuRoC flight fits k = 0.18 to 0.22 per second, correlation up to 0.98 (left: V1_02)."),
-        ("Why it matters:", "velocity integrated once drifts far less than acceleration integrated twice. MH_04 path 6.81 m to 4.07 m, blind 5 s 3.85 m to 0.85 m."),
+        ("Why it matters:", "velocity integrated once drifts far less than acceleration integrated twice. MH_04 path 6.81 m to 4.08 m, blind 5 s 3.85 m to 0.62 m."),
         ("Details that made it work:", "drag read across the measured thrust axis (IMU mounted 20 deg off it), zero velocity on the pad, offsets solved from zero mean velocity."),
         ("Safe:", "switched on only by motor vibration; handheld data is untouched."),
     ], size=14)

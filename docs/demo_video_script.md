@@ -1,60 +1,68 @@
-# Demo Video Walkthrough Script (2 to 3 Minutes)
+# Demo Video Script (about 2.5 minutes, never over 3)
 ## Samsung PRISM XR Hackathon 2026 - Track 3: Path Finder
 
-**Target Duration**: 2 minutes 30 seconds (Strict limit: Never exceed 3 minutes)  
-**Presenter**: Workstream C (Manas Jangid) on behalf of Team Prism PathFinders  
-**Format**: Screen capture with voiceover and live terminal demonstration
+**Presenter**: Manas Jangid, on behalf of Team Prism PathFinders
+**Format**: screen capture with voiceover: slides, then a live terminal, then the figures.
+**Slides**: `presentation/CollegeName_TeamName.pptx` (built by `python tools/make_presentation.py`).
 
 ---
 
-### Segment 1: Introduction & Mission Context (0:00 - 0:35)
-- **Visual**: Show Title Slide / Architecture diagram.
+### Segment 1: The problem (0:00 - 0:30)
+- **Visual**: slide 1 (title), then slide 2 (the problem).
 - **Voiceover**:
-  > "Hello everyone, welcome to our presentation and demonstration of **Track 3: Path Finder** for the Samsung PRISM XR Hackathon 2026.
-  > 
-  > In this challenge, our task is to reconstruct the full 6-DoF trajectory of an aircraft flying through GPS-denied airspace. An adversary is deploying intense electronic jamming against the aircraft's onboard IMU sensor. Over the course of the flight, noise intensifies, sensor bias drifts, sample dropouts and spikes occur, and for the final 5 seconds, the sensor dies completely into total blackout.
-  > 
-  > With no external cameras, GPS, or ground checkpoints, naive numerical integration diverges quadratically within seconds. Furthermore, we must strictly respect the competition's hard limits: pure Python, single thread, under 8 MB of RAM, and under 20 ms per second of telemetry."
+  > "Hi, we are Team Prism PathFinders, and this is Path Finder, for Track 3.
+  >
+  > The task: work out where a device went, in full 3D position and orientation, using nothing but its IMU, the gyroscope and accelerometer. And the data is damaged on purpose: noise that grows, drifting bias, spikes, stuck readings, dropouts of up to two seconds, and for the last five seconds the sensor is dead, all zeros.
+  >
+  > The usual approach, integrating acceleration twice, falls apart within seconds: one degree of tilt error alone is tens of metres of error within a minute. And it has to run in single-thread Python, in under 8 megabytes, faster than 20 milliseconds per second of data."
 
 ---
 
-### Segment 2: Pipeline Architecture & Technical Innovations (0:35 - 1:20)
-- **Visual**: Show diagram of the 7-stage pipeline (`read -> clean -> resample -> attitude -> position -> blind -> write`).
+### Segment 2: The key idea, rotor drag (0:30 - 1:10)
+- **Visual**: slide 6 (`docs/figures/drag.png`). Point at the blue and grey lines lying on top of each other.
 - **Voiceover**:
-  > "To solve this without letting drift explode, we built a 7-stage streaming pipeline inside a single standalone script:
-  > 
-  > 1. **Zero-Overhead Ingestion**: We stream the CSV directly into contiguous C-level float arrays via Python's standard `array` module, bypassing heavy DataFrame allocations.
-  > 2. **Multi-Type Anomaly Cleaning**: We automatically detect sensor column order, strip stuck samples, prune duplicate timestamps, and apply an adaptive median spike filter across all 6 channels.
-  > 3. **Decoupled Attitude & Gravity Lock**: We integrate angular rates into unit quaternions and project against a 30-second rolling gravity vector to permanently eliminate pitch and roll tilt drift.
-  > 4. **Spectral Band-Pass Integration**: Instead of accumulating DC bias, we perform double integration in the frequency domain between 0.02 Hz and 3.0 Hz, with 0.25 horizontal gain and 0.90 vertical gain to preserve genuine flight maneuvers.
-  > 5. **Physics-Based Blind Prediction**: When sensor telemetry flatlines to zero, our blind predictor smoothly coasts on the last reliable velocity while gently returning towards the launch origin."
+  > "Our key idea is a piece of physics most IMU pipelines ignore. On a drone, the thrust points along one body axis. So the accelerometer's other two axes never see gravity or thrust in flight. They see only rotor drag, the air pushing back on the spinning rotors, and that is proportional to the drone's speed.
+  >
+  > So on a drone, the accelerometer is a speedometer. Here, grey is the true velocity from motion capture, and blue is simply the sideways acceleration divided by minus 0.2, with no integration at all. They match, with a correlation of almost 0.9. Every EuRoC flight fits the same constant.
+  >
+  > Speed integrated once drifts far less than acceleration integrated twice. On the hardest flight, MH_04, the path error drops from 6.8 to 4.1 metres, and the error in the dead five seconds from 3.9 metres to 0.85.
+  >
+  > The program switches this on by itself, from the motor vibration it sees in the data, so handheld recordings are not affected."
 
 ---
 
-### Segment 3: Live Terminal Demo & Performance Metrics (1:20 - 2:05)
-- **Visual**: Live terminal window showing execution of `src/main.py` and `tools/score.py`.
-- **Command Executed**:
+### Segment 3: How the rest works (1:10 - 1:35)
+- **Visual**: slide 4 (architecture, seven boxes).
+- **Voiceover**:
+  > "Around that idea is a seven-stage pipeline in one script. It cleans out spikes, stuck readings, duplicates and bad values. It works out orientation from the gyroscope, with tilt held to gravity. It computes position in the frequency domain, with gains fitted per frequency band against motion-capture ground truth, so real fast motion is kept and slow drift is shrunk. And in the dead five seconds it coasts briefly, then heads back to the take-off point, because these flights land where they took off."
+
+---
+
+### Segment 4: Live run (1:35 - 2:05)
+- **Visual**: terminal.
+- **Commands**:
   ```bash
   python src/main.py data/degraded/tumvi_room1/imu0/data.csv estimated_trajectory.txt
-  python tools/score.py src/main.py --label live_demo
+  python tools/plot_path.py data/degraded/tumvi_room1
   ```
+  Then show `results/tumvi_room1.png` (or slide 5).
 - **Voiceover**:
-  > "Let's see it in action. We execute `src/main.py` on the degraded `tumvi_room1` sequence. Notice the speed: the entire 141-second trajectory processes in less than half a second.
-  > 
-  > Now let's examine the official scoring tool output:
-  > - **Format**: 100% OK, exactly matching all 27,330 input rows and timestamps.
-  > - **Absolute Trajectory Error (ATE)**: **0.352 meters**, beating the stay-still benchmark of 1.000 meter by 65%.
-  > - **Blind Window Error**: **0.651 meters**, demonstrating tight tracking even during total blackout.
-  > - **Processing Speed**: **3.17 ms per second of data**, over 6 times faster than the 20 ms limit!
-  > - **Peak Memory**: Just **2.56 MB**, using barely a third of the allowed 8 MB budget!"
+  > "Here it is running on the submitted recording, 141 seconds of handheld data. It finishes in about half a second, using under 4 megabytes, well inside both limits. The output has exactly one pose per input row, with every timestamp copied exactly.
+  >
+  > Blue is our estimate, grey the ground truth. Path error is 0.32 metres, against 1.0 for standing still."
 
 ---
 
-### Segment 4: Stress Resilience & Conclusion (2:05 - 2:30)
-- **Visual**: Show stress test results table and GitHub repository / packaging overview.
+### Segment 5: Robustness and close (2:05 - 2:30)
+- **Visual**: slide 8 (robustness), then slide 9.
 - **Voiceover**:
-  > "Beyond the standard dataset, our pipeline has been hardened across 7 extreme stress suites—including 2-second packet bursts, double damage levels, inverted column orders, and tiny 4-row snippets—with zero crashes and zero format faults.
-  > 
-  > All deliverables, including `src/main.py`, the exact run guide in `src/README.md`, our verified `estimated_trajectory.txt`, `metadata.json`, `Dockerfile`, and the presentation deck, are packaged and verified.
-  > 
-  > Thank you, and we look forward to meeting the Samsung jury on December 9th!"
+  > "We tuned on four recordings, then checked on eight more we never tuned on: about two-thirds less error than standing still on the path. And we threw much worse at it than the official damage: double noise, two-second dropouts, files starting mid-flight, sample rates from 50 to 400 hertz, bad values in the file. No crashes, and the output format is right every time.
+  >
+  > Everything is in our repository: the code, the run guide, Docker, and the scoring tools. Thank you."
+
+---
+
+### Recording checklist
+- Run the commands once before recording, so data and figures are in place.
+- Use the latest `main` branch; the numbers above match it.
+- Keep the terminal font large; hide unrelated windows.

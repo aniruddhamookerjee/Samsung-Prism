@@ -33,9 +33,9 @@
   1. **Strict Memory & Speed Budgeting**: Raw C-level streaming buffers (`array.array`), single-threaded NumPy math, chunked file I/O ($< 3\text{ MB}$ peak allocation, $\sim 2.1\text{ ms/s}$ runtime).
   2. **Multi-Stage Anomaly Filtering**: Real-time rejection of duplicate timestamps, stuck sensor states, and 6-channel adaptive local noise spike trimming.
   3. **Decoupled Orientation & Offline Tilt Locking**: Quiescent bias estimation combined with a 30s rolling gravity-vector projection to eliminate pitch/roll tilt drift.
-  4. **Band-Pass Spectral Integration**: Double integration performed in frequency domain ($0.02\text{ Hz} \dots 3.0\text{ Hz}$) with asymmetric horizontal/vertical attenuation.
+  4. **Band-Pass Spectral Integration**: Double integration performed in frequency domain ($0.02\text{ Hz} \dots 3.0\text{ Hz}$) with gains fitted per frequency band against motion-capture ground truth.
   5. **Rotor-Drag Velocity Sensing**: On a drone, the accelerometer axes across the thrust read $-0.2 \times$ velocity, so slow horizontal motion is measured, not double-integrated.
-  6. **Kinematic Coasting Blind Predictor**: Decaying velocity coasting coupled with mission return attraction during the final 5-second blackout.
+  6. **Kinematic Coasting Blind Predictor**: 0.3 s of velocity coasting, then a return to the estimated take-off point (and, on a drone, the floor height) during the final 5-second blackout.
 
 ---
 
@@ -48,7 +48,7 @@
    1. Stream Reader (array.array C-buffers, 0 memory waste)
                │
                ▼
-   2. Robust Cleaner (drops dups, stuck repeats, spikes, detects dead window)
+   2. Robust Cleaner (drops dups, stuck repeats, spikes, nan rows, detects dead window)
                │
                ▼
    3. Resampler (uniform 200 Hz grid, dropout gap tracking > 0.3s)
@@ -117,18 +117,19 @@
 
 ### Slide 8: Brownie Features & Stress Resilience
 - **Comprehensive Stress Test Suite Tested & Validated**:
-  - **2-Second Extended Dropouts (`gaps2s`)**: Successfully bridges multi-second packet loss without state desync (ATE: 0.635 m).
-  - **2.0x Double Damage (`harsh`)**: Withstands double the organizers' noise and bias degradation (ATE: 0.560 m).
+  - **2-Second Extended Dropouts (`gaps2s`)**: Successfully bridges multi-second packet loss without state desync (ATE: 0.65 m on tumvi_room1).
+  - **2.0x Double Damage (`harsh`)**: Withstands double the organizers' noise and bias degradation (ATE: 0.49 m on tumvi_room1).
   - **Inverted Column Order (`harsh_raw`)**: Auto-identifies whether gyro or accel appears first by inspecting gravitational norms.
   - **Early Jamming Ramp (`early`, $\gamma = 0.7$)**: Operates cleanly when jamming occurs immediately at takeoff.
   - **Edge Cases**: Zero crashes on ultra-short recordings (10s, 3s) and 4-row tiny files.
+  - **Odd Inputs**: 50 to 400 Hz, a 6.5 min file, 5 s gaps, out-of-order and duplicated rows, nan values, CRLF and scientific notation, no header, swapped columns: row count and timestamps always exact, no nan in the output.
 - **Automated Submission Builder**: One-step creation of verified `team_name.zip` with automated checksum and format validation.
 
 ---
 
 ### Slide 9: Thank You & Q&A
 - **Repository**: [https://github.com/aniruddhamookerjee/Samsung-Prism.git](https://github.com/aniruddhamookerjee/Samsung-Prism.git)
-- **Branch**: `Manas`
+- **Branch**: `main`
 - **Contact & Clarifications**: Sent to `prism@samsung.com`
 - **Team Prism PathFinders**:
   - *Sarthak Singh* | *Aniruddha Mookerjee* | *Manas Jangid*

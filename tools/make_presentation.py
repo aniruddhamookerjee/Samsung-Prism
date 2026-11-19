@@ -1,185 +1,315 @@
-#!/usr/bin/env python3
-"""Generates the official 9-slide PowerPoint presentation CollegeName_TeamName.pptx."""
+"""Builds the 9-slide deck presentation/CollegeName_TeamName.pptx.
 
+    pip install python-pptx
+    python tools/make_presentation.py
+
+The tumvi_room1 numbers are read from metadata.json, the figures from
+docs/figures (redraw them with tools/plot_drag.py and tools/plot_path.py).
+Set COLLEGE and TEAM below before the final build.
+"""
+
+import json
 from pathlib import Path
+
 from pptx import Presentation
-from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.util import Inches, Pt
 
-def create_deck(output_path="presentation/CollegeName_TeamName.pptx"):
+COLLEGE = "CollegeName"          # <- fill in
+TEAM = "Team Prism PathFinders"
+MEMBERS = [("Sarthak Singh", "Lead, estimator core"),
+           ("Aniruddha Mookerjee", "Data, degradation and scoring"),
+           ("Manas Jangid", "Robustness, packaging and submission")]
+REPO = "https://github.com/aniruddhamookerjee/Samsung-Prism"
+
+ROOT = Path(__file__).resolve().parents[1]
+FIG = ROOT / "docs" / "figures"
+
+NAVY = RGBColor(0x14, 0x2A, 0x4F)
+BLUE = RGBColor(0x1F, 0x6F, 0xD1)
+ORANGE = RGBColor(0xD1, 0x49, 0x1F)
+DARK = RGBColor(0x22, 0x22, 0x22)
+GREY = RGBColor(0x66, 0x66, 0x66)
+LIGHT = RGBColor(0xEE, 0xF3, 0xFA)
+WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+
+W, H = Inches(13.333), Inches(7.5)
+
+
+def text(slide, x, y, w, h, lines, size=16, color=DARK, bold=False, align=None, anchor=None, font=None):
+    """lines: str or list of str / (str, dict) with per-line overrides."""
+    box = slide.shapes.add_textbox(x, y, w, h)
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = Inches(0.05)
+    tf.margin_top = tf.margin_bottom = Inches(0.02)
+    if anchor:
+        tf.vertical_anchor = anchor
+    if isinstance(lines, str):
+        lines = [lines]
+    for i, ln in enumerate(lines):
+        opt = {}
+        if isinstance(ln, tuple):
+            ln, opt = ln
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        r = p.add_run()
+        r.text = ln
+        if opt.get("mono") or font:
+            r.font.name = "Consolas"
+        r.font.size = Pt(opt.get("size", size))
+        r.font.bold = opt.get("bold", bold)
+        r.font.color.rgb = opt.get("color", color)
+        p.space_before = Pt(opt.get("before", 6 if i else 0))
+        if align or opt.get("align"):
+            p.alignment = opt.get("align", align)
+    return box
+
+
+def bullets(slide, x, y, w, h, items, size=16):
+    lines = []
+    for it in items:
+        if isinstance(it, tuple):          # (bold lead, rest)
+            lines.append(it)
+        else:
+            lines.append((None, it))
+    box = slide.shapes.add_textbox(x, y, w, h)
+    tf = box.text_frame
+    tf.word_wrap = True
+    for i, (lead, rest) in enumerate(lines):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_before = Pt(0 if i == 0 else 10)
+        r = p.add_run()
+        r.text = "▪  "
+        r.font.size = Pt(size)
+        r.font.color.rgb = BLUE
+        if lead:
+            r = p.add_run()
+            r.text = lead + " "
+            r.font.size = Pt(size)
+            r.font.bold = True
+            r.font.color.rgb = NAVY
+        r = p.add_run()
+        r.text = rest
+        r.font.size = Pt(size)
+        r.font.color.rgb = DARK
+    return box
+
+
+def header(slide, num, title, sub=None):
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, W, Inches(0.12))
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = BLUE
+    bar.line.fill.background()
+    text(slide, Inches(0.6), Inches(0.35), Inches(11.5), Inches(0.7), title, size=30, color=NAVY, bold=True)
+    if sub:
+        text(slide, Inches(0.6), Inches(1.0), Inches(11.5), Inches(0.5), sub, size=16, color=GREY)
+    text(slide, Inches(11.9), Inches(7.0), Inches(1.2), Inches(0.35), f"{num} / 9", size=11, color=GREY,
+         align=PP_ALIGN.RIGHT)
+    text(slide, Inches(0.6), Inches(7.0), Inches(8), Inches(0.35),
+         f"Path Finder  |  {TEAM}  |  Samsung PRISM XR Hackathon 2026, Track 3", size=11, color=GREY)
+
+
+def picture(slide, name, x, y, w=None, h=None):
+    p = FIG / name
+    if p.exists():
+        return slide.shapes.add_picture(str(p), x, y, width=w, height=h)
+    text(slide, x, y, w or Inches(4), Inches(0.5), f"[missing figure {name}]", color=ORANGE)
+
+
+def table(slide, x, y, w, rows, col_w, size=14, highlight_col=None):
+    shape = slide.shapes.add_table(len(rows), len(rows[0]), x, y, w, Inches(0.42 * len(rows)))
+    t = shape.table
+    for j, cw in enumerate(col_w):
+        t.columns[j].width = Inches(cw)
+    for i, row in enumerate(rows):
+        for j, val in enumerate(row):
+            c = t.cell(i, j)
+            c.text = str(val)
+            p = c.text_frame.paragraphs[0]
+            p.font.size = Pt(size)
+            p.alignment = PP_ALIGN.LEFT if j == 0 else PP_ALIGN.CENTER
+            c.vertical_anchor = MSO_ANCHOR.MIDDLE
+            c.fill.solid()
+            if i == 0:
+                c.fill.fore_color.rgb = NAVY
+                p.font.color.rgb = WHITE
+                p.font.bold = True
+            else:
+                c.fill.fore_color.rgb = LIGHT if i % 2 else WHITE
+                p.font.color.rgb = DARK
+                if highlight_col is not None and j == highlight_col:
+                    p.font.bold = True
+                    p.font.color.rgb = BLUE
+    return shape
+
+
+def create_deck(output_path=ROOT / "presentation" / "CollegeName_TeamName.pptx"):
+    meta = json.loads((ROOT / "metadata.json").read_text(encoding="utf-8"))
+    acc, perf = meta["accuracy_metrics"], meta["performance"]
+
     prs = Presentation()
-    prs.slide_width = Inches(13.333)
-    prs.slide_height = Inches(7.5)
-    blank_layout = prs.slide_layouts[6]
+    prs.slide_width, prs.slide_height = W, H
+    blank = prs.slide_layouts[6]
 
-    NAVY = RGBColor(15, 32, 67)
-    BLUE = RGBColor(10, 102, 194)
-    DARK = RGBColor(33, 37, 41)
-    GRAY = RGBColor(108, 117, 125)
-    LIGHT_BG = RGBColor(245, 247, 250)
-    WHITE = RGBColor(255, 255, 255)
+    # 1. title
+    s = prs.slides.add_slide(blank)
+    bg = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, W, H)
+    bg.fill.solid()
+    bg.fill.fore_color.rgb = NAVY
+    bg.line.fill.background()
+    text(s, Inches(0.8), Inches(1.6), Inches(11.5), Inches(1.0), "Path Finder", size=54, color=WHITE, bold=True)
+    text(s, Inches(0.8), Inches(2.6), Inches(11.5), Inches(1.0),
+         "6-DoF trajectory from a degraded IMU alone, with rotor drag as a velocity sensor",
+         size=24, color=RGBColor(0xC8, 0xD8, 0xF0))
+    text(s, Inches(0.8), Inches(3.5), Inches(11.5), Inches(0.5),
+         "Samsung PRISM XR Hackathon 2026  |  Track 3", size=18, color=RGBColor(0xC8, 0xD8, 0xF0))
+    text(s, Inches(0.8), Inches(4.6), Inches(11.5), Inches(2.0),
+         [(f"{TEAM}  |  {COLLEGE}", {"bold": True, "size": 20})] +
+         [(f"{n}  -  {r}", {"size": 16}) for n, r in MEMBERS], color=WHITE)
 
-    slides_content = [
-        # Slide 1: Title
-        {
-            "num": "01",
-            "title": "Path Finder: 6-DoF Trajectory Estimator",
-            "subtitle": "Samsung PRISM XR Hackathon 2026 — Track 3: Path Finder",
-            "body": [
-                "Robust 6-DoF Inertial Odometry Under Simulated Sensor Jamming & Total Blackout",
-                "Authors: Sarthak Singh (Estimator Lead) | Aniruddha Mookerjee (Data/Scoring) | Manas Jangid (Robustness/Submission)",
-                "College: CollegeName  |  Team: TeamName",
-                "Submission Deadline: 22 November 2026"
-            ]
-        },
-        # Slide 2: The Problem
-        {
-            "num": "02",
-            "title": "The Problem: Inertial Navigation Under Jamming",
-            "subtitle": "Mission context and physical sensor challenges",
-            "body": [
-                "GPS-Denied Flight: Plane navigates solely by dead reckoning through hostile electronic jamming.",
-                "Deliberate Multi-Type IMU Damage: Organizers' degrade_imu.py injects growing noise, random walk bias, scale drift, impulse spikes, stuck sensor readings (2-10 samples), dropouts up to 2-3.5s, duplicates, and total blackout in final 5 seconds.",
-                "The Drift Dilemma: Plain numerical integration suffers quadratic error explosion (1 deg tilt error = 0.17 m/s² false acceleration = 150m error in 30s).",
-                "Strict Contest Constraints: Single-thread Python main.py, <= 8.0 MB peak memory, <= 20 ms / 1s telemetry runtime, exact 1:1 input/output row count matching."
-            ]
-        },
-        # Slide 3: Proposed Solution
-        {
-            "num": "03",
-            "title": "Our Solution: Bounded Frequency-Domain Odometry",
-            "subtitle": "Disciplined offline physics vs runaway integration",
-            "body": [
-                "Offline Global Vision: Exploiting the contest's offline rule to look ahead and behind across the entire flight.",
-                "Multi-Tiered Anomaly Cleaning: Fast rejection of duplicate rows, stuck repeats, and adaptive local-noise median spike filtering across all 6 IMU channels.",
-                "Gravity-Referenced Attitude Stabilization: Decoupled gyro integration with 30-second rolling gravity-vector projection to permanently lock tilt.",
-                "Spectral Bandpass Double Integration: Position estimated via frequency-domain integration (0.02 Hz to 3.0 Hz), eliminating drift while capturing real maneuvers.",
-                "Kinematic Coasting Blind Predictor: Exponential velocity coasting (tau=0.6s) blended with return-to-home convergence during sensor blackout."
-            ]
-        },
-        # Slide 4: System Architecture
-        {
-            "num": "04",
-            "title": "End-to-End Pipeline Architecture",
-            "subtitle": "7-Stage Lean, Memory-Efficient Processing",
-            "body": [
-                "1. Read Stream: Streams CSV directly into C-level float arrays via array.array (zero dataframe overhead).",
-                "2. Robust Cleaner: Automatically detects column order, dead ending, removes duplicates, stuck samples, and spikes.",
-                "3. Resampler: Interpolates valid rows onto uniform 200 Hz grid; segments dropouts longer than 0.3s.",
-                "4. Attitude Estimation: Integrates gyro rates; applies 30s rolling gravity alignment to eliminate tilt drift.",
-                "5. Position Estimator: Downsamples world-accel to 20 Hz; applies band-pass double integration with 0.25/0.9 horizontal/vertical gain.",
-                "6. Blind 5s Predictor: Coasts on last trustworthy velocity, decaying toward origin.",
-                "7. Chunked Writer: Streams exactly one normalized pose per input row in 1024-row chunks."
-            ]
-        },
-        # Slide 5: Track Final Output & Verification
-        {
-            "num": "05",
-            "title": "Track Final Output & Verified Benchmarks",
-            "subtitle": "Evaluated against ground truth on benchmark tumvi_room1",
-            "body": [
-                "Format Compliance: estimated_trajectory.txt verified with 27,330 poses (100% 1:1 row match), unit quaternions, 0 NaNs, 0 Infs.",
-                "Absolute Trajectory Error (ATE): 0.352 m (Beats Stay-Still baseline of 1.000 m by 65%!).",
-                "Dropout Window ATE: 0.385 m (Beats baseline of 0.870 m by 56%).",
-                "Blind 5s Window ATE: 0.651 m (Maintains stable trajectory through complete sensor failure).",
-                "Relative Pose Error (1s): 0.203 m  |  Rotation Error: 9.719 deg.",
-                "Resource Footprint: Peak Memory = 2.56 MB (Limit: 8.0 MB) | Speed = 3.17 ms/s (Limit: 20.0 ms/s)."
-            ]
-        },
-        # Slide 6: Key Differentiators & Technical Innovations
-        {
-            "num": "06",
-            "title": "Key Differentiators & Technical Innovations",
-            "subtitle": "Why our approach excels where naive math fails",
-            "body": [
-                "Frequency-Domain vs Kalman Filter: Conventional EKFs diverge catastrophically when noise covariance changes dynamically under jamming. Spectral integration inherently bounds maximum error.",
-                "Asymmetric Gain Scaling: Horizontal motion is kept at 0.25 gain below 0.08 Hz (where tilt error leaks) and 0.9 above, while vertical motion is maintained at 0.9 gain.",
-                "Jamming-Adaptive Trust Weighting: Gyro sample-to-sample jitter is monitored continuously; as jamming noise increases, position is smoothly bounded.",
-                "Ultra-Lean Memory Footprint: Complete execution operates in 2.56 MB RAM by avoiding pandas/scipy and streaming large files chunk-by-chunk."
-            ]
-        },
-        # Slide 7: Demo & Local Setup Instructions
-        {
-            "num": "07",
-            "title": "Demo & Local Setup Instructions",
-            "subtitle": "Zero-configuration reproducibility",
-            "body": [
-                "Direct Command: python src/main.py <input.csv | folder | zip> [estimated_trajectory.txt]",
-                "Docker Execution: docker build -t pathfinder . && docker run --rm -v $(pwd)/data:/data pathfinder /data/input.csv /data/output.txt",
-                "Automated Evaluation Suite: python tools/score.py src/main.py --label my_eval",
-                "Flexible Inputs: Directly accepts raw CSVs, directories containing imu0/data.csv, or zipped bundles with automated in-memory extraction.",
-                "Deterministic: Fixed seeds and robust mathematics ensure identical output on any machine."
-            ]
-        },
-        # Slide 8: Brownie Features & Stress Resilience
-        {
-            "num": "08",
-            "title": "Brownie Features & Stress Resilience",
-            "subtitle": "Tested and verified across 7 harsh operational scenarios",
-            "body": [
-                "Extended 2-Second Dropouts (gaps2s): Successfully maintains track through 2.0-3.5s sensor blackout bursts (ATE: 0.635m).",
-                "Double Damage Stress (harsh): Withstands 2.0x maximum organizer noise and bias (ATE: 0.560m).",
-                "Column Order Invariance (harsh_raw): Automatically detects and swaps EuRoC vs degradation column orders.",
-                "Early Jamming (early, gamma=0.7): Handles early jamming attacks right from initial takeoff.",
-                "Edge Case Immunity: Validated with zero crashes on ultra-short recordings (10s, 3s) and tiny 4-row snippets.",
-                "Automated Packaging: tools/build_submission.py validates file counts, formats, and generates verified team_name.zip."
-            ]
-        },
-        # Slide 9: Thank You & Team Q&A
-        {
-            "num": "09",
-            "title": "Thank You & Team Q&A",
-            "subtitle": "Samsung PRISM XR Hackathon 2026 — Track 3",
-            "body": [
-                "GitHub Repository: https://github.com/aniruddhamookerjee/Samsung-Prism.git",
-                "Active Working Branch: Manas",
-                "Organizers Contact: prism@samsung.com",
-                "Team Prism PathFinders: Sarthak Singh | Aniruddha Mookerjee | Manas Jangid",
-                "We look forward to demonstrating Path Finder to the Samsung Jury on 9 December 2026!"
-            ]
-        }
-    ]
+    # 2. problem
+    s = prs.slides.add_slide(blank)
+    header(s, 2, "The problem", "Where did the device go? Only a damaged IMU file to answer it.")
+    bullets(s, Inches(0.6), Inches(1.7), Inches(12), Inches(5), [
+        ("Input:", "gyroscope and accelerometer only (timestamp, 3 x rate, 3 x acceleration). No camera, GPS, magnetometer or map."),
+        ("Damage grows over time:", "noise ramp, drifting bias, scale errors, spikes, stuck readings, dropouts of up to 2 s, duplicated rows."),
+        ("The last 5 seconds are all zeros:", "the position there has to be predicted."),
+        ("Why it is hard:", "a 1 degree tilt error reads as 0.17 m/s^2 of false acceleration; integrated twice that is tens of metres within a minute."),
+        ("Hard limits:", "single-thread Python, peak memory 8 MB, 20 ms of compute per second of data, exactly one TUM pose per input row with its timestamp."),
+    ], size=18)
 
-    for data in slides_content:
-        slide = prs.slides.add_slide(blank_layout)
+    # 3. solution
+    s = prs.slides.add_slide(blank)
+    header(s, 3, "Our solution", "Measure what can be measured, shrink what cannot, never let drift accumulate")
+    bullets(s, Inches(0.6), Inches(1.7), Inches(12), Inches(5), [
+        ("Rotor drag as a velocity sensor (key idea):", "on a drone the accelerometer axes across the thrust read -0.2 x velocity, so slow motion is measured, not integrated twice. Switched on automatically by motor vibration."),
+        ("Clean before anything else:", "duplicates, stuck readings, spikes, nan rows and the dead tail removed; either column order detected from gravity."),
+        ("Attitude:", "gyro integration with the bias from the still start (or fitted from the tilt drift), tilt pinned to gravity averaged over 30 s."),
+        ("Position in the frequency domain:", "gains fitted per frequency band against motion-capture ground truth: fast motion kept, slow motion shrunk where tilt error dominates."),
+        ("Blind 5 s:", "coast 0.3 s on the last velocity, then head for the take-off point (drones land where they took off)."),
+        ("Lean:", "numpy only, array.array input buffers, 20 Hz position work, chunked output: about 3 MB and 2 to 3 ms per second of data."),
+    ], size=17)
 
-        # Header background banner
-        header_box = slide.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(11.7), Inches(1.5))
-        tf = header_box.text_frame
+    # 4. architecture
+    s = prs.slides.add_slide(blank)
+    header(s, 4, "System architecture", "One script, seven stages, one pass over the data")
+    stages = [("Read", "csv / folder / zip\ninto C buffers"), ("Clean", "spikes, stuck,\nduplicates, nan"),
+              ("Resample", "uniform grid,\ngaps > 0.3 s marked"), ("Attitude", "gyro + bias,\ngravity tilt fix"),
+              ("Position", "FFT band gains\n+ rotor drag"), ("Blind 5 s", "coast, then\nhead home"),
+              ("Write", "one TUM pose\nper input row")]
+    bw, gap, y0 = 1.55, 0.22, 2.3
+    for i, (name, desc) in enumerate(stages):
+        x = Inches(0.6 + i * (bw + gap))
+        box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, Inches(y0), Inches(bw), Inches(1.9))
+        box.fill.solid()
+        box.fill.fore_color.rgb = ORANGE if name == "Position" else (NAVY if i % 2 == 0 else BLUE)
+        box.line.fill.background()
+        tf = box.text_frame
         tf.word_wrap = True
-        tf.margin_left = tf.margin_top = tf.margin_right = tf.margin_bottom = 0
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        r = p.add_run(); r.text = f"{i + 1}. {name}"; r.font.size = Pt(16); r.font.bold = True; r.font.color.rgb = WHITE
+        for ln in desc.split("\n"):
+            p = tf.add_paragraph(); p.alignment = PP_ALIGN.CENTER
+            r = p.add_run(); r.text = ln; r.font.size = Pt(11); r.font.color.rgb = WHITE
+        if i < len(stages) - 1:
+            a = s.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, x + Inches(bw + 0.02), Inches(y0 + 0.8), Inches(gap - 0.04), Inches(0.3))
+            a.fill.solid(); a.fill.fore_color.rgb = GREY; a.line.fill.background()
+    bullets(s, Inches(0.6), Inches(4.6), Inches(12), Inches(2.3), [
+        ("Drone or handheld?", "decided from the motor buzz inside 50 ms blocks (drone 1.1 to 1.9 m/s^2, handheld 0.2 to 0.4). Only drones use rotor drag."),
+        ("Below 0.08 Hz", "horizontal position comes from integrating the drag velocity once; above it, from the accelerometer."),
+        ("On the landing pad", "motor buzz drops: velocity is zero and height is held at the floor level."),
+    ], size=16)
 
-        p0 = tf.paragraphs[0]
-        p0.text = f"SLIDE {data['num']}  |  {data['title']}"
-        p0.font.size = Pt(24)
-        p0.font.bold = True
-        p0.font.color.rgb = NAVY
+    # 5. results
+    s = prs.slides.add_slide(blank)
+    header(s, 5, "Results", "Error in metres after rigid alignment; stay-still = output the start point every time")
+    rows = [["recording", "path: stay-still", "path: ours", "blind 5 s: stay-still", "blind 5 s: ours"],
+            ["MH_04_difficult (drone)", "6.81", "4.07", "3.85", "0.85"],
+            ["V1_02_medium (drone)", "1.78", "1.18", "1.04", "0.51"],
+            ["V1_03_difficult (drone)", "1.58", "1.07", "1.27", "0.63"],
+            ["tumvi_room1 (handheld, submitted)", "1.00", f"{acc['ate_rmse_meters']:.2f}", "0.63",
+             f"{acc['blind_5s_rmse_meters']:.2f}"]]
+    table(s, Inches(0.6), Inches(1.6), Inches(7.6), rows, [2.8, 1.15, 1.0, 1.4, 1.25], size=13, highlight_col=2)
+    bullets(s, Inches(0.6), Inches(3.9), Inches(7.6), Inches(3), [
+        ("49 runs, 3 groups (path / blind, x stay-still):", "tuning 0.62 / 0.58; held-out 0.68 / 0.90; five recordings never used for tuning 0.64 / 0.73."),
+        ("Submitted file (tumvi_room1):", f"dropout windows {acc['dropout_gap_rmse_meters']:.2f} m (stay-still 0.87), "
+                                          f"1 s drift {acc['rpe_1s_meters']:.2f} m, rotation {acc['rotation_rmse_degrees']:.1f} deg."),
+        ("Resources:", f"peak memory {perf['peak_memory_mb']:.1f} MB of 8, {perf['runtime_ms_per_second']:.1f} ms per second of data of 20."),
+    ], size=14)
+    picture(s, "MH_04_difficult.png", Inches(8.4), Inches(1.6), w=Inches(4.6))
+    picture(s, "tumvi_room1.png", Inches(8.4), Inches(3.6), w=Inches(4.6))
+    text(s, Inches(8.4), Inches(5.6), Inches(4.6), Inches(0.6),
+         "Top: MH_04 drone flight. Bottom: tumvi_room1 handheld. Grey: ground truth.", size=11, color=GREY)
 
-        p1 = tf.add_paragraph()
-        p1.text = data['subtitle']
-        p1.font.size = Pt(14)
-        p1.font.italic = True
-        p1.font.color.rgb = BLUE
-        p1.space_before = Pt(4)
+    # 6. differentiators
+    s = prs.slides.add_slide(blank)
+    header(s, 6, "What sets it apart: rotor drag", "On a multirotor the accelerometer measures velocity")
+    picture(s, "drag.png", Inches(0.5), Inches(1.5), w=Inches(7.6))
+    bullets(s, Inches(8.3), Inches(1.5), Inches(4.7), Inches(5.4), [
+        ("Physics:", "thrust is along one body axis, so the other two accelerometer axes see only rotor drag, a = -k v."),
+        ("Measured:", "every EuRoC flight fits k = 0.18 to 0.22 per second, correlation up to 0.98 (left: V1_02)."),
+        ("Why it matters:", "velocity integrated once drifts far less than acceleration integrated twice. MH_04 path 6.81 m to 4.07 m, blind 5 s 3.85 m to 0.85 m."),
+        ("Details that made it work:", "drag read across the measured thrust axis (IMU mounted 20 deg off it), zero velocity on the pad, offsets solved from zero mean velocity."),
+        ("Safe:", "switched on only by motor vibration; handheld data is untouched."),
+    ], size=14)
 
-        # Body content box
-        content_box = slide.shapes.add_textbox(Inches(0.8), Inches(2.2), Inches(11.7), Inches(4.8))
-        ctf = content_box.text_frame
-        ctf.word_wrap = True
-        ctf.margin_left = ctf.margin_top = ctf.margin_right = ctf.margin_bottom = 0
+    # 7. demo
+    s = prs.slides.add_slide(blank)
+    header(s, 7, "Demo and setup", "Python 3 and numpy, nothing else")
+    code = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.6), Inches(1.7), Inches(12.1), Inches(2.9))
+    code.fill.solid(); code.fill.fore_color.rgb = RGBColor(0x1E, 0x1E, 0x1E); code.line.fill.background()
+    text(s, Inches(0.8), Inches(1.8), Inches(11.8), Inches(2.8), [
+        ("# run", {"color": RGBColor(0x88, 0x88, 0x88)}),
+        ("python src/main.py data/degraded/tumvi_room1/imu0/data.csv estimated_trajectory.txt", {}),
+        ("# or in Docker", {"color": RGBColor(0x88, 0x88, 0x88), "before": 12}),
+        ("docker build -t pathfinder .", {}),
+        ("docker run --rm -v ${PWD}/data:/data pathfinder /data/<file>/imu0/data.csv /data/out.txt", {}),
+        ("# score against the ground truth", {"color": RGBColor(0x88, 0x88, 0x88), "before": 12}),
+        ("python tools/evalall.py", {}),
+    ], size=15, color=RGBColor(0xE6, 0xE6, 0xE6), font="mono")
+    bullets(s, Inches(0.6), Inches(4.9), Inches(12), Inches(2), [
+        ("Input:", "an imu0/data.csv, a folder holding one, or a zip of it; either column order; header optional."),
+        ("Output:", "estimated_trajectory.txt, one 'timestamp tx ty tz qx qy qz qw' line per input row, timestamps copied exactly."),
+    ], size=16)
 
-        for i, point in enumerate(data['body']):
-            p = ctf.paragraphs[0] if i == 0 else ctf.add_paragraph()
-            p.text = f"•  {point}"
-            p.font.size = Pt(15)
-            p.font.color.rgb = DARK
-            p.space_before = Pt(12)
-            p.line_spacing = 1.15
+    # 8. robustness
+    s = prs.slides.add_slide(blank)
+    header(s, 8, "Robustness", "Tested on far worse than the official degradation")
+    bullets(s, Inches(0.6), Inches(1.7), Inches(6.2), Inches(5.2), [
+        ("Stress sets:", "2x noise and bias, jamming from the first second, 2 s dropouts, files starting mid-flight."),
+        ("Odd inputs:", "50 to 400 Hz, a 6.5 min file, 5 s gaps, out-of-order and duplicated rows, nan values, CRLF and scientific notation, no header, swapped columns."),
+        ("Edge cases:", "empty, one-row, 3 s, all-zero and blind-only files: no crashes, row count and timestamps always exact."),
+        ("Held out honestly:", "settings tuned on 4 recordings, checked on 3 more, then on 5 fetched afterwards."),
+    ], size=16)
+    rows = [["check", "result"],
+            ["harsh (2x damage), tumvi_room1", "0.49 m path"],
+            ["2 s dropouts, tumvi_room1", "0.65 m path"],
+            ["runs worse than stay-still (path)", "1 of 49"],
+            ["peak memory, all real files", "2.8 to 4.4 MB"],
+            ["runtime", "1.4 to 3 ms / s"]]
+    table(s, Inches(7.2), Inches(1.8), Inches(5.5), rows, [3.4, 2.1], size=14, highlight_col=1)
 
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    prs.save(output_path)
-    print(f"Generated presentation: {output_path}")
+    # 9. thanks
+    s = prs.slides.add_slide(blank)
+    bg = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, W, H)
+    bg.fill.solid(); bg.fill.fore_color.rgb = NAVY; bg.line.fill.background()
+    text(s, Inches(0.8), Inches(1.8), Inches(11.5), Inches(1), "Thank you", size=50, color=WHITE, bold=True)
+    text(s, Inches(0.8), Inches(3.0), Inches(11.5), Inches(3), [
+        ("Questions welcome.", {"size": 22}),
+        (REPO, {"size": 18, "before": 18}),
+        (f"{TEAM}  |  {COLLEGE}", {"size": 18, "before": 18}),
+        ("  |  ".join(n for n, _ in MEMBERS), {"size": 16}),
+    ], color=RGBColor(0xC8, 0xD8, 0xF0))
+
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    prs.save(out)
+    print(f"Generated presentation: {out}")
+
 
 if __name__ == "__main__":
     create_deck()

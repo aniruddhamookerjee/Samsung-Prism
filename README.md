@@ -79,6 +79,17 @@ had no bias estimate at all. The rotor-drag step was tuned on the first four
 recordings only and then checked here: it took the mid-flight MH_03 file from
 1.43 of stay-still to 0.90.
 
+A second check, on five more recordings fetched after the drag step was
+finished (`data/extra`: MH_05_difficult, V1_01_easy, V2_01_easy, tumvi_room5,
+tumvi_room6; 10 runs with both column orders), compared with the version before it:
+
+| | path / stay-still | worst run | blind / stay-still |
+| --- | --- | --- | --- |
+| before rotor drag (sarthak-v3) | 0.88 | 1.29 | 1.08 |
+| now (sarthak-v4) | 0.75 | 0.97 | 0.83 |
+
+MH_05_difficult: path 5.37 m against 6.87 m for stay-still, blind 1.91 m against 4.09 m.
+
 To repeat it: `python tools/fetch_euroc.py V2_02_medium MH_03_medium --out
 data/holdout_clean`, `python tools/fetch_tumvi.py room2 room3 room4 --out
 data/holdout_clean`, `python tools/prepare_data.py --clean data/holdout_clean

@@ -21,9 +21,19 @@ WANTED = {
 BLOCK = 4 << 20
 
 
-def http_range(url, lo, hi):
+def ssl_context():
+    """Verified HTTPS, with certifi's certificates when installed (some Python builds lack a CA store)."""
     import ssl
-    ctx = ssl._create_unverified_context()
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+
+def http_range(url, lo, hi):
+    ctx = ssl_context()
     req = urllib.request.Request(url, headers={
         "Range": f"bytes={lo}-{hi}", "User-Agent": "Mozilla/5.0"})
     for attempt in range(10):

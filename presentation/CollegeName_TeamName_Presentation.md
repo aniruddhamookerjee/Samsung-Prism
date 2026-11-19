@@ -30,11 +30,12 @@
 ### Slide 3: Proposed Solution
 - **Core Philosophy**: A disciplined, offline, frequency-bounded inertial estimator that rejects unobservable low-frequency drift before it compounds into quadratic runaway error.
 - **Key Tenets**:
-  1. **Strict Memory & Speed Budgeting**: Raw C-level streaming buffers (`array.array`), single-threaded NumPy math, chunked file I/O ($< 3\text{ MB}$ peak allocation, $\sim 3.2\text{ ms/s}$ runtime).
+  1. **Strict Memory & Speed Budgeting**: Raw C-level streaming buffers (`array.array`), single-threaded NumPy math, chunked file I/O ($< 3\text{ MB}$ peak allocation, $\sim 2.1\text{ ms/s}$ runtime).
   2. **Multi-Stage Anomaly Filtering**: Real-time rejection of duplicate timestamps, stuck sensor states, and 6-channel adaptive local noise spike trimming.
   3. **Decoupled Orientation & Offline Tilt Locking**: Quiescent bias estimation combined with a 30s rolling gravity-vector projection to eliminate pitch/roll tilt drift.
   4. **Band-Pass Spectral Integration**: Double integration performed in frequency domain ($0.02\text{ Hz} \dots 3.0\text{ Hz}$) with asymmetric horizontal/vertical attenuation.
-  5. **Kinematic Coasting Blind Predictor**: Decaying velocity coasting coupled with mission return attraction during the final 5-second blackout.
+  5. **Rotor-Drag Velocity Sensing**: On a drone, the accelerometer axes across the thrust read $-0.2 \times$ velocity, so slow horizontal motion is measured, not double-integrated.
+  6. **Kinematic Coasting Blind Predictor**: Decaying velocity coasting coupled with mission return attraction during the final 5-second blackout.
 
 ---
 
@@ -78,18 +79,20 @@
 - **Scored Results vs Stay-Still Baseline**:
   - **Absolute Trajectory Error (ATE)**: **0.352 m** vs 1.000 m baseline (**65% error reduction!**)
   - **Dropout Gap Window ATE**: **0.385 m** vs 0.870 m baseline (**56% error reduction!**)
-  - **Relative Pose Error (RPE 1s)**: **0.203 m**
-  - **Rotation Error**: **9.719°** across the entire 141-second trajectory.
-  - **Peak Memory**: **2.56 MB** (Budget: 8.0 MB — utilizing only 32% of allowed memory).
-  - **Processing Speed**: **3.17 ms/s** (Budget: 20.0 ms/s — **6.3x faster than required limit**).
+  - **Relative Pose Error (RPE 1s)**: **0.202 m**
+  - **Rotation Error**: **9.721°** across the entire 141-second trajectory.
+  - **Peak Memory**: **3.06 MB** (Budget: 8.0 MB — utilizing only 38% of allowed memory).
+  - **Processing Speed**: **2.07 ms/s** (Budget: 20.0 ms/s — **9.7x faster than required limit**).
+- **Across all drone and handheld runs**: path error 0.70x and blind 5 s error 0.64x of stay-still over 24 tuning runs; 0.72x path over 15 held-out runs, none worse than stay-still.
 
 ---
 
 ### Slide 6: Key Differentiators & Technical Innovations
-1. **Frequency-Domain Double Integration**: Traditional time-domain Riemann integration ($\iint a\,dt^2$) quadratically explodes with any minute tilt bias ($1^\circ \text{ tilt} \to 0.17\text{ m/s}^2 \to 150\text{ m}$ drift in 30s). Our spectral integration filters out the DC drift band while preserving dynamic maneuvers.
-2. **Asymmetric Gain Optimization**: Recognizes that horizontal acceleration is highly sensitive to tilt errors, whereas vertical acceleration is bounded by gravity. Applies horizontal gain ($0.25$) and vertical gain ($0.90$), preventing false lateral wander.
-3. **Adaptive Gyro Jamming Trust Weighting**: Dynamically computes sample-to-sample jitter $\Delta\omega$; as jamming intensifies, position confidence automatically fades toward safe bounds.
-4. **Zero-Overhead Memory Layout**: Eliminates heavy dataframes (pandas) in favor of Python's built-in `array` and float32 block buffers, ensuring complete execution well below 4 MB.
+1. **Rotor Drag as a Velocity Sensor (our key idea)**: A multirotor's thrust is along one body axis, so the other two accelerometer axes see only rotor drag, $a = -k\,v$. Against ground truth every EuRoC flight fits the same $k = 0.18 \dots 0.22\text{ s}^{-1}$ (correlation up to 0.98). Velocity integrated once drifts far less than acceleration integrated twice: MH_04 path error 6.50 m to 5.30 m, blind 5 s error 3.67 m to 1.44 m. Detected automatically from motor vibration, so handheld data is untouched.
+2. **Frequency-Domain Double Integration**: Traditional time-domain Riemann integration ($\iint a\,dt^2$) quadratically explodes with any minute tilt bias ($1^\circ \text{ tilt} \to 0.17\text{ m/s}^2 \to 150\text{ m}$ drift in 30s). Our spectral integration filters out the DC drift band while preserving dynamic maneuvers.
+3. **Asymmetric Gain Optimization**: Recognizes that horizontal acceleration is highly sensitive to tilt errors, whereas vertical acceleration is bounded by gravity. Applies horizontal gain ($0.25$) and vertical gain ($0.90$), preventing false lateral wander.
+4. **Adaptive Gyro Jamming Trust Weighting**: Dynamically computes sample-to-sample jitter $\Delta\omega$; as jamming intensifies, position confidence automatically fades toward safe bounds.
+5. **Zero-Overhead Memory Layout**: Eliminates heavy dataframes (pandas) in favor of Python's built-in `array` and float32 block buffers, ensuring complete execution well below 4 MB.
 
 ---
 

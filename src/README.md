@@ -33,12 +33,12 @@ python src/main.py <input_path> [output_path]
 | Metric | Hackathon Limit | Our Performance (`tumvi_room1`) | Status |
 | :--- | :--- | :--- | :--- |
 | **Language** | Python only (`main.py`) | Pure Python + NumPy | **PASS (100%)** |
-| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **2.56 MB** (algorithm buffers) | **PASS (< 35% of budget)** |
-| **Execution Speed** | `< 20.0 ms / 1 s data` | **3.17 ms / 1 s data** | **PASS (6x faster than limit)** |
+| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.06 MB** (algorithm buffers) | **PASS (< 40% of budget)** |
+| **Execution Speed** | `< 20.0 ms / 1 s data` | **2.07 ms / 1 s data** | **PASS (9x faster than limit)** |
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
 | **Alignment Score (ATE)**| Baseline: 1.00 m | **0.352 m** (0.35x baseline error) | **EXCEEDS BASELINE** |
-| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.651 m** | **STABLE** |
+| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.649 m** | **STABLE** |
 
 ---
 
@@ -85,6 +85,7 @@ The estimator processes telemetry offline in seven sequential stages:
 3. **`resample`**: Interpolates non-uniform timestamps across short gaps onto a steady sampling rate ($f_s \approx 200\text{ Hz}$). Dropout bursts exceeding $0.3\text{ s}$ are marked as unmeasured gaps.
 4. **`attitude`**:
    - Computes initial gyro bias in a quiescent calibration window ($t \le 2.0\text{ s}$).
+   - With no still start (a file that begins mid-flight), fits the gyro bias from how fast the tilt drifts away from gravity, and keeps it only if the fit settles on a plausible value.
    - Integrates angular rates using single-precision unit quaternions.
    - Computes offline tilt correction by observing that the average low-frequency world acceleration vector over $30\text{ s}$ aligns strictly with gravity ($+1g$ vertical).
 5. **`position`**:
@@ -92,9 +93,10 @@ The estimator processes telemetry offline in seven sequential stages:
    - Performs frequency-domain double integration within a tuned pass band ($0.02\text{ Hz} \dots 3.0\text{ Hz}$).
    - Employs asymmetric gain scaling ($0.25$ horizontal, $0.90$ vertical) to penalize false horizontal acceleration induced by residual tilt errors.
    - Attenuates position variance when high-frequency gyro noise indicates heavy sensor jamming.
+   - **Rotor-drag velocity (multirotors)**: when the accelerometer carries motor vibration, the two axes across the thrust measure only rotor drag, $a = -k\,v$ with $k \approx 0.2\text{ s}^{-1}$ (fitted 0.18 to 0.22 on every EuRoC flight against ground truth). Below $0.08\text{ Hz}$, horizontal position comes from integrating this directly measured velocity once instead of acceleration twice. Handheld recordings have no motor vibration and skip this step.
 6. **`blind` 5-Second Prediction**:
    - When the sensor dies, initial velocity is computed over the preceding $0.5\text{ s}$.
-   - Trajectory smoothly coasts with velocity exponential decay ($\tau = 0.6\text{ s}$) while gently returning towards the launch/home position ($\tau = 1.0\text{ s}$), reflecting real mission flight physics.
+   - Trajectory smoothly coasts with velocity exponential decay ($\tau = 0.6\text{ s}$) while gently returning towards the launch/home position, averaged over the first $12\text{ s}$ ($\tau = 1.0\text{ s}$), reflecting real mission flight physics.
 7. **`write`**:
    - Evaluates poses at the exact input timestamps and streams 8 space-separated columns in 1024-row chunks to ensure memory remains $< 3\text{ MB}$ at all times.
 

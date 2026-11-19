@@ -11,6 +11,17 @@ WANTED = {
 CHUNK = 1 << 20
 
 
+def ssl_context():
+    """Verified HTTPS, with certifi's certificates when installed (some Python builds lack a CA store)."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+
 class Tar:
     """Finds files in a remote tar by sampling it, instead of downloading the images."""
 
@@ -23,8 +34,7 @@ class Tar:
 
     @staticmethod
     def _get(url, lo, hi):
-        import ssl
-        ctx = ssl._create_unverified_context()
+        ctx = ssl_context()
         req = urllib.request.Request(url, headers={
             "Range": f"bytes={lo}-{hi}", "User-Agent": "Mozilla/5.0"})
         return urllib.request.urlopen(req, timeout=300, context=ctx)

@@ -17,8 +17,13 @@ Pipeline
                  in the frequency domain inside a band-pass, so slow drift from
                  bias and tilt error never builds up; slow horizontal motion is
                  shrunk hardest, and everything fades where the gyro is noise
+                 on a multirotor (detected from motor buzz), slow horizontal
+                 motion comes instead from rotor drag: the accelerometer axes
+                 across the thrust read -0.2 x velocity, so velocity is measured
+                 directly and only integrated once
     6. blind     after the sensor dies, coast briefly, then head for the
-                 estimated start point (the practice flights end where they began)
+                 estimated start point, averaged over the first 12 s
+                 (the practice flights end where they began)
     7. write     interpolate poses onto every input timestamp, chunk by chunk
 
 Memory stays small because nothing is held per input row except the timestamps
@@ -62,7 +67,14 @@ CFG = {
     "coast_tau_s": 0.6,    # blind segment: velocity decays with this time constant
     "return_tau_s": 1.0,   # blind segment: move to the target with this time constant
     "blind_home": 1.0,     # blind target: 0 = path centre, 1 = estimated start point
-    "home_s": 2.0,         # the start point is the mean over this many seconds
+    "home_s": 12.0,        # the start point is the mean over this many seconds
+    "drag": 1,             # use rotor drag for horizontal velocity when the file looks like a multirotor
+    "drag_vib": 0.7,       # m/s^2 of motor buzz that marks a multirotor
+    "drag_k": 0.2,         # 1/s, rotor drag constant (EuRoC fits 0.18 to 0.22)
+    "drag_smooth_s": 0.5,  # s, averaging of the lateral acceleration
+    "drag_cross_hz": 0.08, # below this, horizontal position comes from drag velocity
+    "drag_lo_hz": 0.01,    # drag velocity is integrated above this
+    "drag_gain": 0.45,     # shrink, for the same reason as gain
     "pos_hz": 20.0,        # rate of the position work
     "long_gap_s": 0.3,     # a dropout longer than this splits the attitude fix
     "gyro_noise_ref": 0.35,  # rad/s of sample-to-sample gyro jitter where trust halves
@@ -468,8 +480,68 @@ def attitude(g, fs, d, calib_n, bgap, seg):
 
 # ---------------------------------------------------------------- 5. position
 
-def band_integrate(a, fs):
-    """Position from acceleration: divide by -(2 pi f)^2 inside a smooth pass band."""
+def block_body_acc(acc, d):
+    """Body-frame acceleration averaged over blocks of d samples."""
+    nb = len(acc) // d
+    out = np.empty((nb, 3))
+    step = max(CHUNK // d, 1) * d
+    for s in range(0, nb * d, step):
+        e = min(s + step, nb * d)
+        out[s // d:e // d] = acc[s:e].astype(np.float64).reshape(-1, d, 3).mean(axis=1)
+    return out
+
+
+def vibration(acc, d):
+    """Median spread of the accelerometer inside blocks of d samples (motor buzz)."""
+    nb = len(acc) // d
+    if nb < 1:
+        return 0.0
+    step = max(nb // 2000, 1)
+    idx = np.arange(0, nb, step)
+    b = acc[:nb * d].reshape(nb, d, 3)[idx].astype(np.float64)
+    b = b[np.any(b != 0, axis=(1, 2))]
+    if len(b) == 0:
+        return 0.0
+    return median(np.sqrt(((b - b.mean(axis=1, keepdims=True)) ** 2).sum(axis=2).mean(axis=1)))
+
+
+def drag_velocity(q, acc, d, fs, bgap):
+    """Horizontal world velocity from rotor drag, or None when it does not apply.
+
+    On a multirotor the thrust is along one body axis, so the accelerometer's
+    two other axes measure only rotor drag, which is -k times the velocity
+    along them: velocity with no integration in it, so no drift. Every EuRoC
+    recording fits k = 0.18 to 0.22 per second against the ground truth. A
+    file counts as a multirotor when its accelerometer carries motor buzz
+    (EuRoC 1.1 to 1.9 m/s^2, handheld TUM-VI 0.2 to 0.4).
+    """
+    if vibration(acc, d) < CFG["drag_vib"]:
+        return None
+    ab = block_body_acc(acc, d)
+    nb = len(ab)
+    ok = ~bgap[:nb]
+    if ok.sum() < int(20 * fs):
+        return None
+    thrust = int(np.argmax(np.abs(ab[ok].mean(axis=0))))
+    vbody = np.zeros((nb, 3))
+    sm = max(int(CFG["drag_smooth_s"] * fs), 1)
+    for k in range(3):
+        if k == thrust:
+            continue
+        x = smooth(ab[:, k:k + 1], sm)[:, 0]
+        vbody[:, k] = -(x - x[ok].mean()) / CFG["drag_k"]
+    vbody[~ok] = 0.0
+    qb = q[(np.arange(nb) * d + d // 2)].astype(np.float64)
+    return qrot(qb, vbody)
+
+
+def band_integrate(a, fs, vel=None):
+    """Position from acceleration: divide by -(2 pi f)^2 inside a smooth pass band.
+
+    With vel (horizontal world velocity from rotor drag), slow horizontal
+    motion comes from integrating that velocity once, and the acceleration
+    only supplies what is faster than drag_cross_hz.
+    """
     n = len(a)
     if n < 8:
         return np.zeros((n, 3))
@@ -501,13 +573,27 @@ def band_integrate(a, fs):
     z_gain = base * ramp(CFG["z_band_lo_hz"], 2 * CFG["z_band_lo_hz"]) * (
         CFG["z_gain"] + (CFG["z_gain_hi"] - CFG["z_gain"]) * ramp(split / 1.5, split * 1.5))
 
+    if vel is not None:
+        cross = 1.0 - ramp(CFG["drag_cross_hz"] / 1.5, CFG["drag_cross_hz"] * 1.5)
+        a_gain = base * (1.0 - cross) * CFG["gain_hi"]
+        v_gain = np.zeros(len(f), complex)
+        v_gain[nz] = cross[nz] * ramp(CFG["drag_lo_hz"], 2 * CFG["drag_lo_hz"])[nz] * CFG["drag_gain"] / (
+            2j * math.pi * f[nz])
+        vel = vel - vel.mean(axis=0)
+
     p = np.empty((n, 3))
     buf = np.zeros(nfft)
     for ax in range(3):
         buf[:] = 0.0
         buf[pad:pad + n] = a[:, ax] * taper
         spec = np.fft.rfft(buf)
-        spec *= z_gain if ax == 2 else h_gain
+        if ax < 2 and vel is not None:
+            spec *= a_gain
+            buf[:] = 0.0
+            buf[pad:pad + n] = vel[:, ax] * taper
+            spec += np.fft.rfft(buf) * v_gain
+        else:
+            spec *= z_gain if ax == 2 else h_gain
         p[:, ax] = np.fft.irfft(spec, nfft)[pad:pad + n]
     return p
 
@@ -608,7 +694,8 @@ def estimate(ts, imu):
         g_mag = float(np.linalg.norm(acc_w[:cb].mean(axis=0)))
         acc_w[:, 2] -= g_mag
         acc_w[bgap] = 0.0          # nothing was measured there
-        p = band_integrate(acc_w, fs / d)
+        drag = drag_velocity(q, g[:, 3:6], d, fs / d, bgap) if CFG["drag"] else None
+        p = band_integrate(acc_w, fs / d, drag)
         p *= gyro_quality(g[:, 0:3], d)[:, None]
         pt = grid0 + (np.arange(len(p)) + 0.5) * d / fs
         del acc_w

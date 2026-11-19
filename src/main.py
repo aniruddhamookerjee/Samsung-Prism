@@ -91,6 +91,7 @@ CFG = {
     "drag_gain": 0.65,     # shrink, for the same reason as gain
     "pos_hz": 20.0,        # rate of the position work
     "long_gap_s": 0.3,     # a dropout longer than this splits the attitude fix
+    "rot_ref": 3.0, "rot_pow": 4.0, "rot_smooth_s": 5.0,  # rad/s: fast rotation shortens the tilt window (gyro scale errors)
     "gyro_noise_ref": 0.35,  # rad/s of sample-to-sample gyro jitter where trust halves
 }
 
@@ -564,6 +565,19 @@ def attitude(g, fs, d, calib_n, bgap, seg):
         short = max(int(CFG["tilt_window_noisy_s"] * fs / d), 1)
         w = (~bgap).astype(float)
         trust = gyro_quality(g[:, 0:3], d)[:, None]
+        if CFG["rot_ref"] > 0:
+            # a gyro scale error turns fast rotation into attitude error
+            # (2% of 2 rad/s is 24 degrees in 10 s), faster than a 30 s
+            # average can follow: lean on the short window where it spins
+            nb = len(g) // d
+            rate = np.empty(nb)
+            step = max(CHUNK // d, 1) * d
+            for s0 in range(0, nb * d, step):
+                e0 = min(s0 + step, nb * d)
+                x = g[s0:e0, 0:3].astype(np.float64)
+                rate[s0 // d:e0 // d] = np.sqrt((x * x).sum(axis=1)).reshape(-1, d).mean(axis=1)
+            rate = smooth(rate[:, None], max(int(CFG["rot_smooth_s"] * fs / d), 1))
+            trust = trust * (1.0 / (1.0 + (rate / CFG["rot_ref"]) ** CFG["rot_pow"]))
         for _ in range(2):
             acc_w = block_world_acc(q, g[:, 3:6], d)
             up = smooth_segments(acc_w, win, seg, w)

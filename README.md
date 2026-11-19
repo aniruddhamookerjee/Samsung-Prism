@@ -24,7 +24,7 @@ exactly one pose per input row and the input timestamps copied digit for digit
 | position | world acceleration averaged to 20 Hz, gravity removed, double-integrated in the frequency domain inside a band-pass | slow drift from bias and tilt error never builds up |
 | shrink | horizontal gain 0.15 below 0.065 Hz and 1.0 above (both fitted per frequency band against the ground truth), height gain 0.3; position faded towards zero where the gyro is mostly noise | a path that is too big costs more than one that is too small |
 | rotor drag | on a drone (found from motor buzz in the accelerometer), slow horizontal motion comes from drag instead: the accelerometer, read perpendicular to the measured thrust direction, gives -0.2 x velocity, which is velocity measured directly; where the buzz drops the drone is on the ground and the velocity is zero | velocity integrated once drifts far less than acceleration integrated twice |
-| blind 5 s | coast for a moment on the last velocity, then head for the estimated start point, averaged over the first 12 s | every practice recording ends within 0.45 m of where it began |
+| blind 5 s | coast for 0.3 s on the last velocity, then head for the estimated start point, averaged over the first 12 s | every practice recording ends within 0.45 m of where it began |
 | write | poses interpolated onto every input timestamp, 1024 rows at a time | memory |
 
 The idea behind the shrink: with an IMU alone, slow horizontal motion cannot be
@@ -60,14 +60,14 @@ velocity (`docs/figures/drag.png`).
 
 | recording | stay-still ate | ours ate | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.09 | 1.04 | 0.48 |
-| V1_03_difficult | 1.58 | 1.12 | 1.27 | 0.68 |
+| V1_02_medium | 1.78 | 1.09 | 1.04 | 0.49 |
+| V1_03_difficult | 1.58 | 1.12 | 1.27 | 0.67 |
 | MH_04_difficult | 6.81 | 4.32 | 3.85 | 0.89 |
 | tumvi_room1 | 1.00 | 0.32 | 0.63 | 0.60 |
 
 Across the default, raw-order and four harsher stress sets (24 runs), the path
 error is 0.63 of stay-still on average (v3, before rotor drag: 0.77) and below it
-in every run; the blind error is 0.57 of stay-still (v3: 0.98). Peak memory is 2.8 to 4.4 MB
+in every run; the blind error is 0.58 of stay-still (v3: 0.98). Peak memory is 2.8 to 4.4 MB
 (tracemalloc, after `import numpy`), runtime 1.4 to 2.9 ms per second of data.
 `python tools/evalall.py` prints these ratios for every local set at once,
 `python tools/plot_path.py data/degraded/tumvi_room1` draws the estimate
@@ -85,7 +85,7 @@ against the ground truth.
 
 All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
 start mid-flight, the 15 held-out runs average 0.68 of stay-still on the path
-(worst 1.05, V2_02 cut to start mid-flight) and 0.93 on the blind 5 s. This check found two real bugs,
+(worst 1.05, V2_02 cut to start mid-flight) and 0.91 on the blind 5 s. This check found two real bugs,
 both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
 bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight
 had no bias estimate at all. The rotor-drag step was tuned on the first four
@@ -101,7 +101,7 @@ tumvi_room6; 10 runs with both column orders), compared with the version before 
 | before rotor drag (sarthak-v3) | 0.88 | 1.29 | 1.08 |
 | first rotor-drag version (sarthak-v4) | 0.75 | 0.97 | 0.83 |
 | thrust direction and ground detection (sarthak-v5) | 0.72 | 0.98 | 0.74 |
-| now (sarthak-v6) | 0.66 | 0.97 | 0.76 |
+| now (sarthak-v6) | 0.66 | 0.97 | 0.75 |
 
 MH_05_difficult: path 4.27 m against 6.87 m for stay-still, blind 1.10 m against 4.09 m.
 

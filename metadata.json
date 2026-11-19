@@ -19,12 +19,12 @@
     "memory_measured_as": "tracemalloc peak during main.py, minus what import numpy already holds (FAQ: algorithm / heap level)"
   },
   "accuracy_metrics": {
-    "ate_rmse_meters": 0.303,
+    "ate_rmse_meters": 0.293,
     "stay_still_baseline_ate_meters": 1.0,
-    "blind_5s_rmse_meters": 0.616,
-    "dropout_gap_rmse_meters": 0.307,
-    "rpe_1s_meters": 0.183,
-    "rotation_rmse_degrees": 9.813
+    "blind_5s_rmse_meters": 0.613,
+    "dropout_gap_rmse_meters": 0.299,
+    "rpe_1s_meters": 0.18,
+    "rotation_rmse_degrees": 9.808
   },
   "system_environment": {
     "os": "Windows 11 / Linux (Docker-ready)",

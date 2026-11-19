@@ -37,8 +37,8 @@ python src/main.py <input_path> [output_path]
 | **Execution Speed** | `< 20.0 ms / 1 s data` | **3.42 ms / 1 s data** | **PASS (about 6x under the limit)** |
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
-| **Alignment Score (ATE)**| Baseline: 1.00 m | **0.303 m** (0.30x baseline error) | **EXCEEDS BASELINE** |
-| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.616 m** | **BEATS BASELINE** |
+| **Alignment Score (ATE)**| Baseline: 1.00 m | **0.293 m** (0.29x baseline error) | **EXCEEDS BASELINE** |
+| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.613 m** | **BEATS BASELINE** |
 
 ---
 
@@ -92,7 +92,7 @@ The estimator processes telemetry offline in seven sequential stages:
 5. **`position`**:
    - Downsamples world acceleration to $20\text{ Hz}$ to drastically cut FFT memory and compute overhead.
    - Performs frequency-domain double integration within a tuned pass band (horizontal from $0.03\text{ Hz}$, vertical from $0.02\text{ Hz}$, up to $3.0\text{ Hz}$).
-   - Employs asymmetric gain scaling ($0.15$ horizontal below $0.065\text{ Hz}$, $1.0$ above) to penalize false horizontal acceleration induced by residual tilt errors.
+   - Employs asymmetric gain scaling ($0.15$ horizontal below $0.055\text{ Hz}$, $1.0$ above) to penalize false horizontal acceleration induced by residual tilt errors.
    - Attenuates position variance when high-frequency gyro noise indicates heavy sensor jamming.
    - **Rotor-drag velocity (multirotors)**: when the accelerometer carries motor vibration, the two directions perpendicular to the measured thrust direction (the EuRoC IMU is mounted about 20 deg off it) measure only rotor drag, $a = -k\,v$ with $k \approx 0.2\text{ s}^{-1}$ (fitted 0.18 to 0.22 on every EuRoC flight against ground truth). Below $0.08\text{ Hz}$, horizontal position comes from integrating this directly measured velocity once instead of acceleration twice. Where the motor vibration drops below 0.6 of its typical level the drone is on the ground, and the velocity is set to zero. Handheld recordings have no motor vibration and skip this step. The side-axis offsets are solved so that the mean velocity in the room is zero, slow motion below $0.02\text{ Hz}$ fades in through a second-order high pass ($f^2/(f^2+f_c^2)$, $f_c = 0.015\text{ Hz}$, gain 0.7) instead of being cut off, and on the ground the height is held at one floor level. A dropout longer than $0.3\text{ s}$ never counts as ground (its interpolated samples carry no motor buzz), and the drag velocity is bridged linearly across it. After a long dropout the heading is unknown (the turn made inside it cannot be measured), so the horizontal path is scaled by the expected cosine of the heading error, which grows with the gap length times the file's typical turn rate.
 6. **`blind` 5-Second Prediction**:

@@ -131,7 +131,9 @@ Known limits:
   bias that drifts makes it wander. With the raw column order or a mid-flight
   start the rotation error reaches 40 to 180 degrees on some files; with the
   default order and a still start it is 4 to 20 degrees.
-- A 3 s file takes about 30 ms per second, nearly all of it the NumPy import.
+- Start-up costs about 160 ms, nearly all of it the NumPy import. A file shorter
+  than about 9 s goes over 20 ms per second (10 s: 17 ms/s, 3 s: 55 ms/s).
+  Every EuRoC and TUM-VI recording is 80 s or longer.
 - About 2.1 MB of tracemalloc peak is Python compiling the script itself, on any input.
 - Tuning: `python tools/tune.py key=value ...` scores settings in-process.
 
@@ -239,8 +241,9 @@ Notes:
 - evo accepts files with repeated timestamps, so we keep one pose per input row.
 - `evo_ape -a` refuses a path that never moves ("Degenerate covariance rank").
   `score.py` falls back to a shift only, so the stay-still baseline still gets a number.
-- `import numpy` alone shows up as about 6.7 MB in tracemalloc. If the organisers
-  count imports, 8 MB is not reachable with NumPy, so this is worth asking them.
+- `import numpy` alone shows up as about 6.7 MB in tracemalloc. The FAQ says memory
+  is measured at the algorithm / heap level, so we report `mem_mb`. Counting the
+  import, 8 MB is not reachable with NumPy.
 - `tools/naive_integrate.py` is plain integration with no bias handling, kept as
   a reference. It ends up kilometres off, so stay-still is the real bar. It also
   holds every row as Python floats and already uses 6 to 10 MB doing so.

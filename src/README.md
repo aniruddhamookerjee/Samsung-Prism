@@ -33,8 +33,8 @@ python src/main.py <input_path> [output_path]
 | Metric | Hackathon Limit | Our Performance (`tumvi_room1`) | Status |
 | :--- | :--- | :--- | :--- |
 | **Language** | Python only (`main.py`) | Pure Python + NumPy | **PASS (100%)** |
-| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.06 MB** (algorithm buffers) | **PASS (< 40% of budget)** |
-| **Execution Speed** | `< 20.0 ms / 1 s data` | **2.17 ms / 1 s data** | **PASS (9x faster than limit)** |
+| **Peak Memory** | `< 8.0 MB` (tracemalloc) | **3.83 MB** (algorithm buffers) | **PASS (< 50% of budget)** |
+| **Execution Speed** | `< 20.0 ms / 1 s data` | **3.42 ms / 1 s data** | **PASS (about 6x under the limit)** |
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
 | **Alignment Score (ATE)**| Baseline: 1.00 m | **0.318 m** (0.32x baseline error) | **EXCEEDS BASELINE** |
@@ -122,6 +122,6 @@ The estimator processes telemetry offline in seven sequential stages:
 | 2 | **Input Archive Packaging** | Folder or `.zip` file | Built-in streaming zipfile extraction without disk inflation. |
 | 3 | **Sensor Column Order** | EuRoC (`gyro, accel`) vs Script (`accel, gyro`) | Auto-detected using gravity norm heuristics ($g \approx 9.81$). |
 | 4 | **Dropout Window Duration** | Gaps up to $2.0 \dots 3.5\text{ s}$ | Resampler tracks gap boundaries; skips acceleration integration across unmeasured voids. |
-| 5 | **Memory Measurement** | Peak Python `tracemalloc` | Strictly $< 4.0\text{ MB}$ peak allocation during processing. |
+| 5 | **Memory Measurement** | Peak Python `tracemalloc`, without what `import numpy` holds (FAQ: algorithm / heap level) | 2.8 to 5.3 MB on every practice and stress run. Counting the NumPy import it is 9.5 to 12 MB. |
 | 6 | **Duplicates & Jitter** | Identical rows & timestamps | Handled gracefully: output preserves duplicate poses corresponding to repeated input rows. |
 | 7 | **Sensor Total Failure** | Trailing $5\text{ s}$ all-zeros | Detected dynamically; dead-reckoning state transitions to blind coasting. |

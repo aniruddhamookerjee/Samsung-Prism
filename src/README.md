@@ -88,7 +88,7 @@ The estimator processes telemetry offline in seven sequential stages:
    - Computes initial gyro bias in a quiescent calibration window ($t \le 2.0\text{ s}$).
    - With no still start (a file that begins mid-flight), fits the gyro bias from how fast the tilt drifts away from gravity, and keeps it only if the fit settles on a plausible value. Where the device rotates fast the tilt correction leans on a shorter (8 s) gravity average, since a gyro scale error turns fast rotation into attitude error. The fit also runs from the median gyro reading (its part along gravity removed), and that result is kept when it leaves at least 20% less tilt drift.
    - Integrates angular rates using single-precision unit quaternions.
-   - Computes offline tilt correction by observing that the average low-frequency world acceleration vector over $30\text{ s}$ aligns strictly with gravity ($+1g$ vertical).
+   - Computes offline tilt correction by observing that the average low-frequency world acceleration vector over $35	ext{ s}$ ($6	ext{ s}$ where the gyro is noisy or spins fast) aligns strictly with gravity ($+1g$ vertical).
 5. **`position`**:
    - Downsamples world acceleration to $20\text{ Hz}$ to drastically cut FFT memory and compute overhead.
    - Performs frequency-domain double integration within a tuned pass band (horizontal from $0.03\text{ Hz}$, vertical from $0.02\text{ Hz}$, up to $3.0\text{ Hz}$).

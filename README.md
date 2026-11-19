@@ -55,38 +55,46 @@ velocity in the room is zero (the flights end where they began), and the height
 is held at one floor level wherever the drone is on the ground.
 `python tools/plot_drag.py` draws the drag velocity against the motion-capture
 velocity (`docs/figures/drag.png`).
+Below 0.02 Hz the drag velocity's slowly wandering offset turns into drift once
+integrated, but the slow motion is still there: a second-order high pass
+(corner 0.015 Hz, gain 0.7) keeps it instead of cutting everything below 0.01 Hz.
+A per-band fit against the ground truth showed the integrated drag velocity
+still explains most of the motion between 0.003 and 0.02 Hz at a small gain.
+For the blind 5 s on a drone, the target height is the floor level measured on
+the ground stretches: in the ground truth every practice flight ends within
+about 0.15 m of its take-off height.
 
-### Results (sarthak-v6, metres)
+### Results (sarthak-v7, metres)
 
 Organisers' damage, default column order:
 
 | recording | stay-still ate | ours ate | ours / stay-still | stay-still blind | ours blind | stay-still gaps | ours gaps | rotation (deg) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| V1_02_medium | 1.78 | 1.09 | 0.61 | 1.04 | 0.49 | 1.61 | 1.02 | 3.6 |
-| V1_03_difficult | 1.58 | 1.12 | 0.71 | 1.27 | 0.67 | 1.09 | 0.95 | 8.0 |
-| MH_04_difficult | 6.81 | 4.32 | 0.64 | 3.85 | 0.89 | 7.87 | 4.00 | 15.5 |
+| V1_02_medium | 1.78 | 1.18 | 0.66 | 1.04 | 0.51 | 1.61 | 1.14 | 3.2 |
+| V1_03_difficult | 1.58 | 1.07 | 0.68 | 1.27 | 0.62 | 1.09 | 0.91 | 7.3 |
+| MH_04_difficult | 6.81 | 4.06 | 0.60 | 3.85 | 0.85 | 7.87 | 3.76 | 16.2 |
 | tumvi_room1 | 1.00 | 0.32 | 0.32 | 0.63 | 0.60 | 0.87 | 0.33 | 9.7 |
 
 Every damage type, as a fraction of stay-still (mean of the 4 recordings, worst in brackets):
 
 | damage | path | blind 5 s | around gaps |
 | --- | --- | --- | --- |
-| organisers' | 0.57 (0.71) | 0.55 (0.96) | 0.60 (0.87) |
-| organisers', raw column order | 0.58 (0.74) | 0.62 (0.97) | 0.63 (0.92) |
-| damage from the start | 0.63 (0.67) | 0.58 (1.14) | 0.67 (0.80) |
-| twice the damage | 0.62 (0.75) | 0.49 (1.01) | 0.70 (0.97) |
-| twice, raw column order | 0.65 (0.73) | 0.60 (1.06) | 0.74 (0.94) |
-| gaps of 2 to 3.5 s | 0.70 (0.76) | 0.61 (1.06) | 0.88 (1.21) |
+| organisers' | 0.56 (0.68) | 0.54 (0.96) | 0.60 (0.84) |
+| organisers', raw column order | 0.59 (0.72) | 0.62 (0.97) | 0.63 (0.89) |
+| damage from the start | 0.63 (0.69) | 0.57 (1.14) | 0.68 (0.80) |
+| twice the damage | 0.61 (0.71) | 0.50 (1.01) | 0.70 (0.96) |
+| twice, raw column order | 0.65 (0.72) | 0.63 (1.06) | 0.74 (0.90) |
+| gaps of 2 to 3.5 s | 0.70 (0.74) | 0.61 (1.06) | 0.88 (1.20) |
 
-Over the 24 runs the path error is 0.63 of stay-still (v3, before rotor drag:
+Over the 24 runs the path error is 0.62 of stay-still (v3, before rotor drag:
 0.77) and below it in every run; the blind error is 0.58 of stay-still (v3:
 0.98). Five runs are slightly worse than stay-still on one window: the blind 5 s
 on tumvi_room1 under the four harsher sets (at most 0.09 m worse; the handheld
 recording has no rotor drag to read velocity from), and the gaps on
-V1_03_difficult with 2 to 3.5 s gaps (1.19 m against 0.98 m).
+V1_03_difficult with 2 to 3.5 s gaps (1.18 m against 0.98 m).
 
-Peak memory is 2.8 to 5.3 MB (tracemalloc, after `import numpy`), runtime 2.7
-to 4.2 ms per second of data on one laptop, 1.4 to 2.9 ms on another.
+Peak memory is 3.3 to 5.3 MB (tracemalloc, after `import numpy`), runtime 2.3
+to 3.3 ms per second of data on one laptop, 1.4 to 2.9 ms on another.
 
 ![error against stay-still](docs/figures/results_errors.png)
 ![every damage type](docs/figures/results_stress.png)
@@ -102,15 +110,15 @@ against the ground truth.
 
 | recording | stay-still ate | ours ate | ours, raw column order | stay-still blind | ours blind |
 | --- | --- | --- | --- | --- | --- |
-| V2_02_medium | 2.12 | 1.51 | 1.53 | 2.69 | 2.87 |
-| MH_03_medium | 3.59 | 2.36 | 2.63 | 3.09 | 2.00 |
+| V2_02_medium | 2.12 | 1.46 | 1.51 | 2.69 | 2.73 |
+| MH_03_medium | 3.59 | 2.23 | 2.57 | 3.09 | 2.02 |
 | tumvi_room2 | 1.22 | 0.32 | 0.34 | 0.72 | 0.68 |
 | tumvi_room3 | 1.25 | 0.61 | 0.58 | 0.70 | 0.75 |
 | tumvi_room4 | 1.08 | 0.77 | 0.79 | 0.78 | 0.76 |
 
 All 10 runs beat stay-still on the path. Together with five EuRoC files cut to
 start mid-flight, the 15 held-out runs average 0.68 of stay-still on the path
-(worst 1.05, V2_02 cut to start mid-flight) and 0.91 on the blind 5 s. This check found two real bugs,
+(worst 1.05, V2_02 cut to start mid-flight) and 0.90 on the blind 5 s. This check found two real bugs,
 both fixed: idling motors on the pad were taken for movement, so the EuRoC gyro
 bias (about 0.08 rad/s) was never removed; and a file that starts mid-flight
 had no bias estimate at all. The rotor-drag step was tuned on the first four
@@ -126,9 +134,10 @@ tumvi_room6; 10 runs with both column orders), compared with the version before 
 | before rotor drag (sarthak-v3) | 0.88 | 1.29 | 1.08 |
 | first rotor-drag version (sarthak-v4) | 0.75 | 0.97 | 0.83 |
 | thrust direction and ground detection (sarthak-v5) | 0.72 | 0.98 | 0.74 |
-| now (sarthak-v6) | 0.66 | 0.97 | 0.75 |
+| offsets, height pin, handheld gains (sarthak-v6) | 0.66 | 0.97 | 0.75 |
+| slow drag motion kept (sarthak-v7) | 0.64 | 0.93 | 0.73 |
 
-MH_05_difficult: path 4.27 m against 6.87 m for stay-still, blind 1.10 m against 4.09 m.
+MH_05_difficult: path 4.02 m against 6.87 m for stay-still, blind 0.83 m against 4.09 m.
 
 To repeat it: `python tools/fetch_euroc.py V2_02_medium MH_03_medium --out
 data/holdout_clean`, `python tools/fetch_tumvi.py room2 room3 room4 --out

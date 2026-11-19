@@ -38,7 +38,7 @@ python src/main.py <input_path> [output_path]
 | **Parallelism** | Single thread only | Strictly single thread | **PASS** |
 | **Output Integrity** | Exact 1:1 row count & timestamps | 27,330 / 27,330 exact match | **PASS** |
 | **Alignment Score (ATE)**| Baseline: 1.00 m | **0.318 m** (0.32x baseline error) | **EXCEEDS BASELINE** |
-| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.600 m** | **BEATS BASELINE** |
+| **Blind 5s Window ATE** | Baseline: 0.63 m | **0.603 m** | **BEATS BASELINE** |
 
 ---
 
@@ -96,7 +96,7 @@ The estimator processes telemetry offline in seven sequential stages:
    - **Rotor-drag velocity (multirotors)**: when the accelerometer carries motor vibration, the two directions perpendicular to the measured thrust direction (the EuRoC IMU is mounted about 20 deg off it) measure only rotor drag, $a = -k\,v$ with $k \approx 0.2\text{ s}^{-1}$ (fitted 0.18 to 0.22 on every EuRoC flight against ground truth). Below $0.08\text{ Hz}$, horizontal position comes from integrating this directly measured velocity once instead of acceleration twice. Where the motor vibration drops below 0.6 of its typical level the drone is on the ground, and the velocity is set to zero. Handheld recordings have no motor vibration and skip this step.
 6. **`blind` 5-Second Prediction**:
    - When the sensor dies, initial velocity is computed over the preceding $0.5\text{ s}$.
-   - Trajectory smoothly coasts with velocity exponential decay ($\tau = 0.6\text{ s}$) while gently returning towards the launch/home position, averaged over the first $12\text{ s}$ ($\tau = 1.0\text{ s}$), reflecting real mission flight physics.
+   - Trajectory smoothly coasts with velocity exponential decay ($\tau = 0.3\text{ s}$) while gently returning towards the launch/home position, averaged over the first $12\text{ s}$ ($\tau = 1.0\text{ s}$), reflecting real mission flight physics.
 7. **`write`**:
    - Evaluates poses at the exact input timestamps and streams 8 space-separated columns in 1024-row chunks to ensure memory remains $< 3\text{ MB}$ at all times.
 

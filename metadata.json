@@ -10,20 +10,20 @@
   "output_row_count": 27330,
   "format_verification": "ok",
   "performance": {
-    "runtime_ms_per_second": 2.174,
+    "runtime_ms_per_second": 2.172,
     "runtime_limit_ms_per_second": 20.0,
     "peak_memory_mb": 3.065,
-    "peak_memory_with_imports_mb": 9.962,
+    "peak_memory_with_imports_mb": 9.963,
     "peak_memory_limit_mb": 8.0,
     "cpu_threads": 1
   },
   "accuracy_metrics": {
     "ate_rmse_meters": 0.318,
     "stay_still_baseline_ate_meters": 1.0,
-    "blind_5s_rmse_meters": 0.6,
-    "dropout_gap_rmse_meters": 0.33,
-    "rpe_1s_meters": 0.193,
-    "rotation_rmse_degrees": 9.733
+    "blind_5s_rmse_meters": 0.603,
+    "dropout_gap_rmse_meters": 0.331,
+    "rpe_1s_meters": 0.194,
+    "rotation_rmse_degrees": 9.732
   },
   "system_environment": {
     "os": "Windows 11 / Linux (Docker-ready)",

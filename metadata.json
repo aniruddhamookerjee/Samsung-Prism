@@ -10,12 +10,13 @@
   "output_row_count": 27330,
   "format_verification": "ok",
   "performance": {
-    "runtime_ms_per_second": 2.172,
+    "runtime_ms_per_second": 3.418,
     "runtime_limit_ms_per_second": 20.0,
-    "peak_memory_mb": 3.065,
-    "peak_memory_with_imports_mb": 9.963,
+    "peak_memory_mb": 3.833,
+    "peak_memory_with_imports_mb": 10.496,
     "peak_memory_limit_mb": 8.0,
-    "cpu_threads": 1
+    "cpu_threads": 1,
+    "memory_measured_as": "tracemalloc peak during main.py, minus what import numpy already holds (FAQ: algorithm / heap level)"
   },
   "accuracy_metrics": {
     "ate_rmse_meters": 0.318,
@@ -27,9 +28,10 @@
   },
   "system_environment": {
     "os": "Windows 11 / Linux (Docker-ready)",
-    "python_version": "3.13.0 / 3.11-slim",
+    "python_version": "3.13.4 local, 3.11.18 in Docker",
     "required_packages": [
       "numpy"
-    ]
+    ],
+    "numpy_version": "2.3.0 local, 2.4.6 in Docker"
   }
 }

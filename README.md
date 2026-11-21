@@ -1,5 +1,19 @@
 # Samsung PRISM XR Hackathon 2026 - Track 3: Path Finder
 
+**Team SAM · SRM Institute of Science and Technology, KTR**
+
+## Submission contents
+
+| Item | Where |
+| --- | --- |
+| Submission package | [`bundle/SAM.zip`](bundle/SAM.zip): code, README, trajectory, metadata, requirements, Dockerfile, slides |
+| Source code | [`src/main.py`](src/main.py) (Python 3 + NumPy), tools in [`tools/`](tools/) |
+| Output trajectory | [`estimated_trajectory.txt`](estimated_trajectory.txt) (TUM format, tumvi_room1) and [`metadata.json`](metadata.json) |
+| Presentation | [`presentation/SRMIST_KTR_SAM.pptx`](presentation/SRMIST_KTR_SAM.pptx) |
+| Video (3:30) | [`video/PathFinder_TeamSAM_Video.mp4`](video/PathFinder_TeamSAM_Video.mp4) |
+| AI disclosure | [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) |
+| APK / SDK | Not applicable: this is a Python script |
+
 Estimate a 6-DoF trajectory from a degraded IMU recording only.
 
 ## Running the estimator

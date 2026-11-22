@@ -10,7 +10,7 @@
 | Source code | [`src/main.py`](src/main.py) (Python 3 + NumPy), tools in [`tools/`](tools/) |
 | Output trajectory | [`estimated_trajectory.txt`](estimated_trajectory.txt) (TUM format, tumvi_room1) and [`metadata.json`](metadata.json) |
 | Presentation | [`presentation/SRMIST_KTR_SAM.pptx`](presentation/SRMIST_KTR_SAM.pptx) |
-| Video (3:30) | [`video/PathFinder_TeamSAM_Video.mp4`](video/PathFinder_TeamSAM_Video.mp4) |
+| Video (2:58) | [`video/PathFinder_TeamSAM_Video.mp4`](video/PathFinder_TeamSAM_Video.mp4) |
 | AI disclosure | [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) |
 | APK / SDK | Not applicable: this is a Python script |
 

@@ -18,9 +18,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and execution assets
+# Copy source code (src/README.md documents it)
 COPY src/ ./src/
-COPY README.md .
 
 # Default execution interface:
 # Example: docker run --rm -v $(pwd)/data:/data pathfinder /data/degraded/imu0/data.csv /data/output.txt

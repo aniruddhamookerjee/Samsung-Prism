@@ -46,6 +46,15 @@ def build_bundle(zip_path=ZIP):
         data[rel] = committed(rel)
         print(f"  [OK] {rel} ({len(data[rel])} bytes)")
 
+    for line in data["Dockerfile"].decode().splitlines():
+        parts = line.split()
+        if parts and parts[0] == "COPY":
+            for src in parts[1:-1]:
+                src = src.rstrip("/")
+                if not any(rel == src or rel.startswith(src + "/") for rel in data):
+                    raise ValueError(f"Dockerfile copies {src}, which is not in the bundle")
+    print("  [OK] every Dockerfile COPY source is in the bundle")
+
     rows = [l.split() for l in data["estimated_trajectory.txt"].decode().splitlines()
             if l.strip() and not l.startswith("#")]
     if not rows or any(len(r) != 8 for r in rows):
